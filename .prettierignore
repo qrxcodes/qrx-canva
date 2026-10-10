@@ -1,3 +1,7 @@
 .agents
 .claude
 .codex
+dist
+node_modules
+submission
+package-lock.json

@@ -33,3 +33,6 @@ declare module "*.svg?react" {
 }
 
 declare const BACKEND_HOST: string;
+
+/** Injected at build time by canva-app.config.ts; undefined under Jest. */
+declare const QRX_CONFIG: import("../utils/qrx_config").QrxConfig | undefined;

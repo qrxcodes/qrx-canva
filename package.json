@@ -1,23 +1,30 @@
 {
+  "name": "qrx-canva",
+  "version": "0.1.0",
   "private": true,
-  "name": "empty-template",
+  "description": "QRX for Canva: make an art QR code from a prompt and a link, and add it to your design.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/qrxcodes/qrx-canva.git"
+  },
+  "homepage": "https://qrx.codes",
   "engines": {
     "node": "^22 || ^24"
   },
   "scripts": {
-    "build": "npx @canva/cli apps build",
-    "format": "prettier '**/*.{css,ts,tsx}' --no-config --write",
-    "format:check": "prettier '**/*.{css,ts,tsx}' --no-config --check",
-    "format:file": "prettier $1 --no-config --write",
+    "build": "canva apps build",
+    "start": "canva apps start",
+    "start:preview": "canva apps start --preview",
+    "format": "prettier \"**/*.{css,ts,tsx}\" --write",
+    "format:check": "prettier \"**/*.{css,ts,tsx}\" --check",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "lint:check": "npm run lint && npm run lint:types",
     "lint:types": "tsc",
-    "start": "npx @canva/cli apps start",
-    "start:preview": "npx @canva/cli apps start --preview",
-    "test": "jest --no-cache --passWithNoTests",
+    "typecheck": "tsc",
+    "test": "jest --passWithNoTests",
     "test:watch": "jest --watchAll",
-    "test:update": "npm run test -- -u",
+    "portal-config": "tsx ./scripts/portal_config.ts",
     "postinstall": "tsx ./scripts/copy_env.ts"
   },
   "dependencies": {
@@ -32,7 +39,8 @@
     "@canva/user": "^2.3.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-intl": "^7.1.11"
+    "react-intl": "^7.1.11",
+    "obscenity": "0.4.6"
   },
   "devDependencies": {
     "@canva/app-eslint-plugin": "^1.0.1",
@@ -63,7 +71,8 @@
     "prettier": "3.6.2",
     "ts-jest": "29.4.1",
     "tsx": "4.22.4",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "@canva/cli": "2.14.0"
   },
   "overrides": {
     "nwsapi": "2.2.24",

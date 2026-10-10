@@ -36,3 +36,11 @@
 .scrollContainer:focus-within::-webkit-scrollbar-thumb {
   visibility: visible;
 }
+
+/* Style picker tile: preview with its name underneath */
+.styleTile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-kit-space-050);
+  min-width: 0;
+}
