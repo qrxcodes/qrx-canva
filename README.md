@@ -1,179 +1,135 @@
-# Canva App
+# QRX for Canva
 
-Welcome to your Canva App! 🎉
+A Canva app that turns a picture description and a link into an art QR code, and adds it to your design.
 
-This is a starting point for your app using your chosen template. The complete documentation for the platform is at [canva.dev/docs/apps](https://www.canva.dev/docs/apps/).
+- **Connect a QRX account** through Canva's OAuth support. QRX uses Clerk as its identity provider; Canva stores and
+  refreshes the tokens, so the app keeps none of its own.
+- **Describe the picture, add the link, pick a style.** The link field accepts `example.com/menu` and adds `https://`.
+- **Wait about a minute.** The app long-polls the QRX API and shows a progress bar paced to the usual time. Every code
+  is decoded by QRX to check that it scans before it's returned.
+- **Add to design.** The finished PNG is uploaded to the user's media (marked as AI-generated) and placed on the page.
+  Recent codes can be added the same way.
 
-**Note:** This code and documentation assumes some experience with TypeScript and React.
+Each code opens a hosted `qrx.to` short link that sends people to the user's page. On a paid plan, where it points can
+be changed later on qrx.codes.
+
+![The app panel: form, progress and the finished code](submission/screenshots/panel-overview.png)
 
 ## Requirements
 
-- Node.js `v24`
-- npm `v11`
+- Node.js 24 (`.nvmrc`) and npm 11
+- A Canva developer account to preview the app in the editor (see [Previewing in Canva](#previewing-in-canva))
 
-**Note:** To make sure you're running the correct version of Node.js, we recommend using a version manager, such as [nvm](https://github.com/nvm-sh/nvm#intro). The [.nvmrc](/.nvmrc) file in the root directory of this repo will ensure the correct version is used once you run `nvm install`.
-
-## Quick start
+## Commands
 
 ```bash
-npm install
+npm install          # also copies .env.template to .env
+npm start            # development server on http://localhost:8080
+npm test             # Jest unit tests
+npm run lint         # ESLint with Canva's app rules
+npm run typecheck    # tsc
+npm run build        # dist/app.js and dist/messages_en.json for the Developer Portal
+npm run portal-config  # prints the Developer Portal auth settings and the CORS origin the API must allow
 ```
 
-## Running your Canva App
-
-### Step 1: Start the local development server
-
-To start the boilerplate's development server, run the following command:
+The bundle uploaded to the Developer Portal must be built against production:
 
 ```bash
-npm start
+QRX_API_BASE=https://qrx.codes npm run build
 ```
 
-The server becomes available at <http://localhost:8080>.
+CI builds that bundle on every push and keeps it as the `canva-app-bundle` artifact.
 
-The app's source code is in the `src/app.tsx` file.
+## Configuration
 
-### Step 2: Preview the app
+Settings are read from the environment (and `.env`) at build time and compiled into the bundle by
+`canva-app.config.ts`. None of them are secrets.
 
-The local development server only exposes a JavaScript bundle, so you can't preview an app by visiting <http://localhost:8080>. You can only preview an app via the Canva editor.
+| Variable | Default | Meaning |
+|---|---|---|
+| `QRX_API_BASE` | `https://qrx.codes` | QRX API origin. `.env.template` sets `https://dev.qrx.codes` for development. |
+| `QRX_API_MODE` | `canva` | `canva`: calls `/canva/v1/…` with the Canva user token in `Authorization` and the QRX token in `QRX_TOKEN_HEADER`, so the API can verify that requests come from this app. `direct`: calls `/v1/…` with the QRX token in `Authorization`. |
+| `QRX_TOKEN_HEADER` | `X-QRX-Authorization` | Header for the QRX access token in `canva` mode (`Bearer <token>`). |
+| `QRX_OAUTH_SCOPES` | `qrx:read qrx:generate offline_access` | Scopes requested on connect. |
+| `QRX_OAUTH_RESOURCE` | `<QRX_API_BASE>/v1` | RFC 8707 `resource` added to the authorisation URL, so tokens are issued for the REST API. `none` sends none. |
+| `QRX_OAUTH_PROVIDER` | (empty) | Provider name, if the Developer Portal lists more than one auth provider. |
+| `QRX_SITE_URL` | `QRX_API_BASE` | Where "See plans" links go (only shown where Canva allows payments). |
+| `CANVA_APP_ID`, `CANVA_APP_ORIGIN`, `CANVA_HMR_ENABLED` | | From the Developer Portal's `.env` file; used by the development server and `portal-config`. |
+| `QRX_OAUTH_ISSUER`, `QRX_OAUTH_CLIENT_ID` | dev Clerk | Used only by `portal-config`. The client ID and secret are entered in the Developer Portal, never in the bundle. |
 
-To preview an app:
+## How it talks to QRX
 
-1. Create an app via the [Developer Portal](https://www.canva.com/developers/apps).
-2. Select **App source > Development URL**.
-3. In the **Development URL** field, enter the URL of the development server.
-4. Click **Preview**. This opens the Canva editor (and the app) in a new tab.
-5. Click **Open**. (This screen only appears when using an app for the first time.)
+Built on the public REST API ([OpenAPI](https://qrx.codes/v1/openapi.json)):
 
-The app will appear in the side panel.
+| Step | Request |
+|---|---|
+| Styles | `GET {base}/styles` |
+| Recent codes | `GET {base}/codes?limit=12` (finished link codes only are shown) |
+| Create | `POST {base}/codes` with `{ prompt, destination, style? }` and an `Idempotency-Key`; retried once with the same key after a network failure, and after `409 idempotency-in-progress` |
+| Wait | `GET {base}/codes/{id}?wait=25`, repeated until `succeeded` or `failed` (gives up waiting after 5 minutes; the code still appears in Recent codes) |
 
-<details>
-  <summary>Previewing apps in Safari</summary>
+`{base}` is `/canva/v1` in `canva` mode and `/v1` in `direct` mode. A `401` triggers one forced token refresh and
+retry; a second `401` returns the panel to the Connect state. Problem types (`daily-limit`, `rate-limited`,
+`invalid-request`, …) map to the messages in `src/logic/errors.ts`.
 
-By default, the development server is not HTTPS-enabled. This is convenient, as there's no need for a security certificate, but it prevents apps from being previewed in Safari.
+Canva requires uploaded image URLs not to redirect. QRX image URLs may redirect to storage, so the app resolves the
+final URL with a `HEAD` request before `upload()` and falls back to the original URL if it can't.
 
-**Why Safari requires the development server to be HTTPS-enabled?**
+Prompts are checked with the same `obscenity` word filter the API uses before anything is sent.
 
-Canva itself is served via HTTPS and most browsers prevent HTTPS pages from loading scripts via non-HTTPS connections. Chrome and Firefox make exceptions for local servers, such as `localhost`, but Safari does not, so if you're using Safari, the development server must be HTTPS-enabled.
+## Previewing in Canva
 
-To learn more, see [Loading mixed-content resources](https://developer.mozilla.org/en-US/docs/Web/Security/Mixed_content#loading_mixed-content_resources).
+1. Create an app in the [Developer Portal](https://www.canva.com/developers/apps) and copy its `.env` values
+   (Security > Credentials) into `.env`.
+2. Enable the `canva:asset:private:write` and `canva:design:content:write` permissions (they are also in
+   `canva-app.json`).
+3. Add the auth provider with the values from `npm run portal-config`, then copy the Redirect URL Canva shows into
+   the Clerk OAuth application.
+4. `npm start`, set **App source > Development URL** to `http://localhost:8080`, and click **Preview**.
 
-To preview apps in Safari:
+The QRX API must allow the app's origin (`https://app-<appid>.canva-apps.com`) in CORS, including the
+`X-QRX-Authorization` header in `canva` mode, and the image host must allow it too.
 
-1. Start the development server with HTTPS enabled:
+## API prerequisites
 
-```bash
-npm start --use-https
+The app is built against the documented contract; these pieces are on the QRX API side and must be live (dev first,
+then prod) before the app works in Canva:
+
+- **CORS** on `/v1` and `/canva/v1` for `https://app-<appid>.canva-apps.com` (each Canva app record has its own ID),
+  allowing the `Authorization`, `Content-Type`, `Idempotency-Key` and (in `canva` mode) `X-QRX-Authorization` headers.
+- **Canva request verification** (`canva` mode): `/canva/v1/codes`, `/canva/v1/codes/{id}` and `/canva/v1/styles`
+  accept the Canva user token in `Authorization` (checked against Canva's JWKS for the app IDs) and the QRX access
+  token in `X-QRX-Authorization: Bearer …`, and behave like the matching `/v1` routes. Not needed if Canva confirms
+  OAuth alone is enough (`QRX_API_MODE=direct`).
+- **Token audience:** tokens from Canva's sign-in must be accepted on those routes. Canva sends `resource` only on the
+  authorise request, not the token request.
+- **Images Canva can upload:** `imageUrl` must not redirect, or the redirect and the final host must allow the app's
+  origin in CORS so the app can resolve it. Today `https://qrx.codes/media/premium/<id>.png` answers `302` to
+  storage with CORS for `https://qrx.codes` only.
+- **Style previews:** `/v1/styles` returns `previewUrl`s under `/images/styles/*.png`, which no longer exist on the
+  site (the images are at `/img/styles/<name>-192.webp`). Until that's fixed, the panel falls back to a plain style list.
+
+## Project layout
+
+```
+src/
+  index.tsx                     registers the design editor intent
+  intents/design_editor/        panel entry and App component
+  api/                          QRX client, types, image URL resolution
+  auth/use_qrx_auth.ts          Canva OAuth wrapper
+  logic/                        validation, polling, progress, error mapping
+  components/                   style picker, progress, result, recent codes, alerts
+  messages.ts                   every UI string (extracted for Canva's translation)
+utils/qrx_config.ts             build-time settings
+submission/                     Developer Portal listing pack and the tools that made its images
 ```
 
-2. Navigate to <https://localhost:8080>.
-3. Bypass the invalid security certificate warning:
-   1. Click **Show details**.
-   2. Click **Visit website**.
-4. In the Developer Portal, set the app's **Development URL** to <https://localhost:8080>.
-5. Click preview (or refresh your app if it's already open).
+## Listing and review
 
-You need to bypass the invalid security certificate warning every time you start the local server. A similar warning will appear in other browsers (and will need to be bypassed) whenever HTTPS is enabled.
+Everything the Developer Portal asks for is in [`submission/`](submission/README.md): listing text, icons, featured
+images, policy links, reviewer instructions and questionnaire answers.
 
-</details>
+## Licence
 
-### Step 3 (Optional): Enable Hot Module Replacement
-
-By default, every time you make a change to an app, you have to reload the entire app to see the results of those changes. If you enable [Hot Module Replacement](https://webpack.js.org/concepts/hot-module-replacement/) (HMR), changes will be reflected without a full reload, which significantly speeds up the development loop.
-
-**Note:** HMR does **not** work while running the development server in a Docker container.
-
-To enable HMR:
-
-1. Navigate to an app via the [Your apps](https://www.canva.com/developers/apps).
-1. Select **Security** -> **Credentials** -> **.env file**.
-1. Copy the `.env` file contents.
-1. Paste the contents into the starter kit's `.env` file. For example:
-
-   ```bash
-   CANVA_APP_ORIGIN=https://app-aabbccddeeff.canva-apps.com
-   CANVA_HMR_ENABLED=true
-   ```
-
-1. Restart the local development server.
-1. Reload the app manually to ensure that HMR takes effect.
-
-### Step 4 (Optional): Setup the Canva Dev MCP Server
-
-If you're using AI coding tools, such as Cursor or Claude Code, you can connect to the Canva Dev MCP Server to supercharge your development workflow. See this [setup guide](https://www.canva.dev/docs/apps/mcp-server/) to get started.
-
-## Running an app's backend
-
-Some templates provide an example backend. This backend is defined in the template's `backend/server.ts` file, automatically starts when the `npm start` command is run, and becomes available at <http://localhost:3001>.
-
-To run templates that have a backend:
-
-1. Navigate to the [Your apps](https://www.canva.com/developers/apps) page.
-1. Select the app you want to run the example with.
-1. Copy your environment variables from **Security** -> **Credentials** -> **.env file**.
-1. Paste the contents into the starter kit's `.env` file.
-
-   For example:
-
-   ```bash
-   CANVA_APP_ID=AABBccddeeff
-   CANVA_APP_ORIGIN=https://app-aabbccddeeff.canva-apps.com
-   CANVA_BACKEND_PORT=3001
-   CANVA_FRONTEND_PORT=8080
-   CANVA_BACKEND_HOST=http://localhost:3001
-   CANVA_HMR_ENABLED=TRUE
-   ```
-
-1. Start the app:
-
-   ```bash
-   npm start
-   ```
-
-The ID of the app must be explicitly defined because it's required to [send and verify HTTP requests](https://www.canva.dev/docs/apps/verifying-http-requests/). If you don't set up the ID in the `.env` file, an error will be thrown when attempting to run the example.
-
-## Customizing the backend host
-
-If your app has a backend, the URL of the server likely depends on whether it's a development or production build. For example, during development, the backend is probably running on a localhost URL, but once the app's in production, the backend needs to be exposed to the internet.
-
-To more easily customize the URL of the server:
-
-1. Open the `.env` file in the text editor of your choice.
-2. Set the `CANVA_BACKEND_HOST` environment variable to the URL of the server.
-3. When sending a request, use `BACKEND_HOST` as the base URL:
-
-   ```ts
-   const response = await fetch(`${BACKEND_HOST}/custom-route`);
-   ```
-
-   **Note:** `BACKEND_HOST` is a global constant that contains the value of the `CANVA_BACKEND_HOST` environment variable. The variable is made available to the app via webpack and does not need to be imported.
-
-4. Before bundling the app for production, update `CANVA_BACKEND_HOST` to point to the production backend.
-
-## Configure ngrok (optional)
-
-If your app requires authentication with a third party service, your server needs to be exposed via a publicly available URL, so that Canva can send requests to it.
-This step explains how to do this with [ngrok](https://ngrok.com/).
-
-**Note:** ngrok is a useful tool, but it has inherent security risks, such as someone figuring out the URL of your server and accessing proprietary information. Be mindful of the risks, and if you're working as part of an organization, talk to your IT department.
-You must replace ngrok urls with hosted API endpoints for production apps.
-
-To use ngrok, you'll need to do the following:
-
-1. Sign up for a ngrok account at <https://ngrok.com/>.
-2. Locate your ngrok [authtoken](https://dashboard.ngrok.com/get-started/your-authtoken).
-3. Set an environment variable for your authtoken, using the command line. Replace `<YOUR_AUTH_TOKEN>` with your actual ngrok authtoken:
-
-   For macOS and Linux:
-
-   ```bash
-   export NGROK_AUTHTOKEN=<YOUR_AUTH_TOKEN>
-   ```
-
-   For Windows PowerShell:
-
-   ```shell
-   $Env:NGROK_AUTHTOKEN = "<YOUR_AUTH_TOKEN>"
-   ```
-
-This environment variable is available for the current terminal session, so the command must be re-run for each new session. Alternatively, you can add the variable to your terminal's default parameters.
+MIT, except the files that came from Canva's app template, which stay under [Canva's licence](LICENSE-CANVA.md). See
+[LICENSE](LICENSE).

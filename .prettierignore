@@ -3,5 +3,5 @@
 .codex
 dist
 node_modules
-submission
+submission/tools/harness/dist
 package-lock.json

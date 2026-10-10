@@ -4,7 +4,7 @@
   "runtime": {
     "permissions": [
       {
-        "name": "canva:design:content:read",
+        "name": "canva:asset:private:write",
         "type": "mandatory"
       },
       {

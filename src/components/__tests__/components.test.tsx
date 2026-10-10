@@ -69,7 +69,7 @@ describe("recentCodesToShow", () => {
       makeCode({ id: "a" }),
       makeCode({ id: "b", status: "processing", imageUrl: null }),
       makeCode({ id: "c", status: "failed", imageUrl: null }),
-      makeCode({ id: "d", type: "wifi", shortUrl: null }),
+      makeCode({ id: "d", type: "other", shortUrl: null }),
     ];
     expect(recentCodesToShow(codes).map((code) => code.id)).toEqual(["a"]);
   });

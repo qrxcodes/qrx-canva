@@ -22,7 +22,11 @@ import { App } from "../app";
 
 jest.mock("@canva/app-hooks");
 
-const config = { ...DEFAULT_QRX_CONFIG, apiBase: "https://dev.qrx.codes" };
+const config = {
+  ...DEFAULT_QRX_CONFIG,
+  apiBase: "https://dev.qrx.codes",
+  oauthResource: "",
+};
 
 const styles = route("GET", "/canva/v1/styles", () =>
   jsonResponse(200, { object: "list", data: STYLES, hasMore: false }),

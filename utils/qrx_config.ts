@@ -17,7 +17,10 @@ export type QrxConfig = {
   tokenHeader: string;
   /** Scopes requested when connecting a QRX account. */
   oauthScopes: string[];
-  /** RFC 8707 `resource` sent on the authorisation request, if any. */
+  /**
+   * RFC 8707 `resource` sent on the authorisation request, so the token's
+   * audience is the QRX REST API. Empty to send none.
+   */
   oauthResource: string;
   /** Auth provider name from the Developer Portal; empty for the default. */
   oauthProvider: string;
@@ -30,7 +33,7 @@ export const DEFAULT_QRX_CONFIG: QrxConfig = {
   apiMode: "canva",
   tokenHeader: "X-QRX-Authorization",
   oauthScopes: ["qrx:read", "qrx:generate", "offline_access"],
-  oauthResource: "",
+  oauthResource: "https://qrx.codes/v1",
   oauthProvider: "",
   siteUrl: "https://qrx.codes",
 };
@@ -88,7 +91,9 @@ export function readQrxConfig(
     ? scopes.split(/[\s,]+/).filter(Boolean)
     : DEFAULT_QRX_CONFIG.oauthScopes;
 
-  const resource = get("QRX_OAUTH_RESOURCE") ?? "";
+  // Defaults to the REST API's audience on the chosen host; "none" sends none.
+  const rawResource = get("QRX_OAUTH_RESOURCE") ?? `${apiBase}/v1`;
+  const resource = rawResource === "none" ? "" : rawResource;
   if (resource) {
     originOf(resource, "QRX_OAUTH_RESOURCE");
   }

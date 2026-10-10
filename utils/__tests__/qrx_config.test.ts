@@ -27,6 +27,15 @@ describe("readQrxConfig", () => {
     });
   });
 
+  it("asks for the REST API's audience on the chosen host by default", () => {
+    expect(
+      readQrxConfig({ QRX_API_BASE: "https://dev.qrx.codes" }).oauthResource,
+    ).toBe("https://dev.qrx.codes/v1");
+    expect(readQrxConfig({ QRX_OAUTH_RESOURCE: "none" }).oauthResource).toBe(
+      "",
+    );
+  });
+
   it("treats blank values as unset", () => {
     expect(
       readQrxConfig({ QRX_API_BASE: " ", QRX_OAUTH_RESOURCE: "" }),

@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      CANVA_CLI_DISABLE_TELEMETRY: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint -- --max-warnings=0
+
+      - name: Format
+        run: npm run format:check
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build (production API)
+        run: npm run build
+        env:
+          QRX_API_BASE: https://qrx.codes
+          QRX_OAUTH_RESOURCE: https://qrx.codes/v1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: canva-app-bundle
+          path: |
+            dist/app.js
+            dist/messages_en.json
+          if-no-files-found: error
