@@ -19,11 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-Files that came from Canva's app template (canva-app.json, jest.setup.ts,
-jest.config.mjs, eslint.config.mjs, tsconfig.json, scripts/copy_env.ts,
-declarations/declarations.d.ts, src/utils/test_render.tsx and
-styles/components.css) remain under Canva's licence in LICENSE-CANVA.md, which
-limits their use to apps for the Canva platform.

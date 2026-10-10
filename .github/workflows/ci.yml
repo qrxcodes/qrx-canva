@@ -14,9 +14,9 @@ jobs:
     env:
       CANVA_CLI_DISABLE_TELEMETRY: "true"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -41,7 +41,7 @@ jobs:
           QRX_API_BASE: https://qrx.codes
           QRX_OAUTH_RESOURCE: https://qrx.codes/v1
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: canva-app-bundle
           path: |

@@ -131,5 +131,7 @@ images, policy links, reviewer instructions and questionnaire answers.
 
 ## Licence
 
-MIT, except the files that came from Canva's app template, which stay under [Canva's licence](LICENSE-CANVA.md). See
-[LICENSE](LICENSE).
+[MIT](LICENSE), except the files that came from Canva's app template (`canva-app.json`, `jest.setup.ts`,
+`jest.config.mjs`, `eslint.config.mjs`, `tsconfig.json`, `scripts/copy_env.ts`, `declarations/declarations.d.ts`,
+`src/utils/test_render.tsx` and `styles/components.css`), which stay under [Canva's licence](LICENSE-CANVA.md). That
+licence limits their use to apps for the Canva platform.
