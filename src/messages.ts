@@ -181,6 +181,12 @@ export const messages = defineMessages({
     defaultMessage: "Recent codes",
     description: "Heading for the list of the user's recent QR codes.",
   },
+  recentFailed: {
+    defaultMessage:
+      "Your recent codes couldn't be loaded. Select Refresh to try again.",
+    description:
+      "Shown when the list of the user's recent QR codes failed to load.",
+  },
   recentEmpty: {
     defaultMessage: "Codes you make will appear here.",
     description: "Shown when the user has no codes yet.",

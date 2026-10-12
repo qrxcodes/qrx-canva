@@ -21,27 +21,23 @@ else (qrx.codes, the MCP server, the Chrome extension).
 ### Short description
 
 ```
-Art QR codes that are checked to scan, with a hosted short link
+Art QR codes that are checked to scan
 ```
 
-63 characters. One sentence, so no closing punctuation; sentence case; no acronyms beyond "QR", which is the product
-category itself.
+37 characters (limit: 50). One sentence, so no closing punctuation; sentence case; no acronyms beyond "QR", which is
+the product category itself.
 
-Alternatives, if the reviewer asks for a different angle:
-- `Turn a picture idea and a link into an art QR code that scans` (61)
-- `Make art QR codes for your designs, each one checked to scan` (60)
+Alternative, if the reviewer asks for a different angle: `Turn a picture idea into an art QR code that scans` (50).
 
 ### Description
 
 ```
-QRX turns a picture description and a link into a QR code that is part of the picture. Before a code is ready, QRX decodes the finished image to check that it opens your link, so the codes you add to your design scan. Each code points at its own short qrx.to link, which sends people on to your page. On a paid plan, you can change where a code points after it has been printed, so the design keeps working when your page moves. Choose from 11 styles, such as watercolour, pixel art and charcoal, or describe the look yourself, then add the code to your design with one click. The images are made with AI and are marked as AI-generated in your uploads. You need a QRX account to make codes, and you can create a free one when you connect.
+Describe a picture and add a link. QRX paints a QR code into the picture, checks that it scans, and adds it to your design. On a paid plan, you can change where a code points after printing.
 ```
 
-738 characters, plain text, no line breaks, every sentence ends with punctuation, "design" for what the user makes, no
-marketing claims ("best", "always", "most popular" are all absent), no hyperlinks.
-
-`qrx.to` is a domain the user sees on every code, not a link. If the reviewer reads it as an external link, use this
-sentence instead: "Each code points at its own hosted short link, which sends people on to your page."
+190 characters (limit: 200), plain text, no line breaks, every sentence ends with punctuation, "design" for what the user
+makes, no marketing claims, no hyperlinks. The longer points (the hosted qrx.to link, the 11 styles, AI-generated
+images, the free account) are in the panel itself and in the testing instructions.
 
 ### What leads, and why
 
@@ -82,8 +78,9 @@ qrx.codes showcase; the panel is the app's own UI rendered outside Canva with sa
 
 ## Links
 
-| Field | URL |
+| Field | Value |
 |---|---|
+| Company or your name | QRX |
 | Terms and conditions URL | https://qrx.codes/terms |
 | Privacy policy URL | https://qrx.codes/privacy |
 | Support URL | https://qrx.codes/support |

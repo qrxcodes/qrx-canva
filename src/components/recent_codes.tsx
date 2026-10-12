@@ -17,6 +17,8 @@ type Props = {
   onAdd: (code: Code) => void;
   onRefresh: () => void;
   loading: boolean;
+  /** The last load failed (shown instead of the empty message). */
+  failed?: boolean;
 };
 
 /** Finished link codes, newest first. Selecting one adds it to the design. */
@@ -33,6 +35,7 @@ export const RecentCodes = ({
   onAdd,
   onRefresh,
   loading,
+  failed = false,
 }: Props) => {
   const intl = useIntl();
   const shown = recentCodesToShow(codes);
@@ -54,7 +57,11 @@ export const RecentCodes = ({
           </Button>
         </Column>
       </Columns>
-      {shown.length === 0 ? (
+      {failed && shown.length === 0 ? (
+        <Text size="small" tone="tertiary">
+          {intl.formatMessage(messages.recentFailed)}
+        </Text>
+      ) : shown.length === 0 ? (
         <Text size="small" tone="tertiary">
           {intl.formatMessage(messages.recentEmpty)}
         </Text>

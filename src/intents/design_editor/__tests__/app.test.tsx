@@ -244,6 +244,96 @@ describe("App", () => {
     ).toBeTruthy();
   });
 
+  it("retries the first loads of styles and recent codes when they fail", async () => {
+    let styleCalls = 0;
+    let recentCalls = 0;
+    const flakyStyles = route("GET", "/canva/v1/styles", () =>
+      ++styleCalls === 1
+        ? problem(502, "server-error")
+        : jsonResponse(200, { object: "list", data: STYLES, hasMore: false }),
+    );
+    const flakyRecent = route("GET", "/canva/v1/codes", () =>
+      ++recentCalls === 1
+        ? problem(502, "server-error")
+        : jsonResponse(200, {
+            object: "list",
+            data: [makeCode({ id: "old111", prompt: "Old code" })],
+            hasMore: false,
+          }),
+    );
+    const api = fakeFetch(flakyStyles, flakyRecent);
+    renderInTestProvider(
+      <App
+        oauth={fakeOauth()}
+        config={config}
+        fetchImpl={api.fetch}
+        listRetryDelaysMs={[0, 0]}
+      />,
+    );
+
+    expect(await screen.findByText("Style: No style")).toBeTruthy();
+    expect(
+      await screen.findAllByRole("button", {
+        name: "Add this QR code to the design",
+      }),
+    ).toHaveLength(1);
+    expect(styleCalls).toBe(2);
+    expect(recentCalls).toBe(2);
+  });
+
+  it("says when recent codes can't be loaded, and Refresh loads them and the styles", async () => {
+    let failing = true;
+    const styleRoute = route("GET", "/canva/v1/styles", () =>
+      failing
+        ? problem(500, "server-error")
+        : jsonResponse(200, { object: "list", data: STYLES, hasMore: false }),
+    );
+    const recentRoute = route("GET", "/canva/v1/codes", () =>
+      failing
+        ? problem(500, "server-error")
+        : jsonResponse(200, {
+            object: "list",
+            data: [makeCode({ id: "old111", prompt: "Old code" })],
+            hasMore: false,
+          }),
+    );
+    const api = fakeFetch(styleRoute, recentRoute);
+    renderInTestProvider(
+      <App
+        oauth={fakeOauth()}
+        config={config}
+        fetchImpl={api.fetch}
+        listRetryDelaysMs={[0, 0]}
+      />,
+    );
+
+    expect(
+      await screen.findByText(
+        "Your recent codes couldn't be loaded. Select Refresh to try again.",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Styles couldn't be loaded. You can still create a code.",
+      ),
+    ).toBeTruthy();
+
+    failing = false;
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+
+    expect(await screen.findByText("Style: No style")).toBeTruthy();
+    expect(
+      await screen.findAllByRole("button", {
+        name: "Add this QR code to the design",
+      }),
+    ).toHaveLength(1);
+    expect(
+      screen.queryByText(
+        "Your recent codes couldn't be loaded. Select Refresh to try again.",
+      ),
+    ).toBeNull();
+  });
+
   it("refuses blocked words without calling QRX", async () => {
     const api = fakeFetch(styles, recent([]));
     renderInTestProvider(

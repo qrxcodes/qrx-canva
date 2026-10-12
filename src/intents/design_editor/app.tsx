@@ -55,12 +55,39 @@ const LINK_ERRORS = {
 const isAbort = (error: unknown) =>
   error instanceof Error && error.name === "AbortError";
 
+const isUnauthorized = (error: unknown) =>
+  error instanceof QrxApiError && error.kind === "unauthorized";
+
+/** Pauses before each retry of the panel's first loads. */
+const LIST_RETRY_DELAYS_MS = [1000, 3000];
+
+/**
+ * Runs `load`, retrying after each delay when it fails for any reason but a
+ * refused token: just after an account connects, the first calls can fail
+ * while QRX or Canva is still catching up.
+ */
+async function withRetries<T>(
+  load: () => Promise<T>,
+  delaysMs: readonly number[],
+): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await load();
+    } catch (caught) {
+      if (isUnauthorized(caught) || attempt >= delaysMs.length) throw caught;
+      await new Promise((resolve) => setTimeout(resolve, delaysMs[attempt]));
+    }
+  }
+}
+
 export type AppProps = {
   oauth: Oauth;
   config?: QrxConfig;
   /** For tests: replaces fetch in the QRX client. */
   fetchImpl?: typeof fetch;
   now?: () => number;
+  /** For tests: the pauses between retries of the first loads. */
+  listRetryDelaysMs?: readonly number[];
 };
 
 export const App = ({
@@ -68,6 +95,7 @@ export const App = ({
   config = defaultConfig,
   fetchImpl,
   now = Date.now,
+  listRetryDelaysMs = LIST_RETRY_DELAYS_MS,
 }: AppProps) => {
   const intl = useIntl();
   const qrxAuth = useQrxAuth(oauth, config);
@@ -90,6 +118,7 @@ export const App = ({
   const [stylesFailed, setStylesFailed] = useState(false);
   const [recent, setRecent] = useState<Code[]>([]);
   const [recentLoading, setRecentLoading] = useState(false);
+  const [recentFailed, setRecentFailed] = useState(false);
   const [adding, setAdding] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -109,42 +138,64 @@ export const App = ({
     [markSignedOut],
   );
 
-  const loadRecent = useCallback(async () => {
-    setRecentLoading(true);
-    try {
-      setRecent(await client.listCodes(RECENT_CODES_LIMIT));
-    } catch (caught) {
-      if (caught instanceof QrxApiError && caught.kind === "unauthorized") {
-        markSignedOut();
+  const loadRecent = useCallback(
+    async (retryDelaysMs: readonly number[] = []) => {
+      setRecentLoading(true);
+      try {
+        setRecent(
+          await withRetries(
+            () => client.listCodes(RECENT_CODES_LIMIT),
+            retryDelaysMs,
+          ),
+        );
+        setRecentFailed(false);
+      } catch (caught) {
+        if (isUnauthorized(caught)) {
+          markSignedOut();
+        } else {
+          setRecentFailed(true);
+        }
+      } finally {
+        setRecentLoading(false);
       }
-    } finally {
-      setRecentLoading(false);
-    }
-  }, [client, markSignedOut]);
+    },
+    [client, markSignedOut],
+  );
+
+  const loadStyles = useCallback(
+    async (retryDelaysMs: readonly number[] = []) => {
+      try {
+        setStyleList(
+          await withRetries(() => client.listStyles(), retryDelaysMs),
+        );
+        setStylesFailed(false);
+      } catch (caught) {
+        if (isUnauthorized(caught)) {
+          markSignedOut();
+        } else {
+          setStylesFailed(true);
+        }
+      }
+    },
+    [client, markSignedOut],
+  );
 
   useEffect(() => {
     if (status !== "signed-in") {
       setStyleList([]);
       setRecent([]);
+      setRecentFailed(false);
       return;
     }
-    let cancelled = false;
-    client
-      .listStyles()
-      .then((list) => {
-        if (!cancelled) {
-          setStyleList(list);
-          setStylesFailed(false);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setStylesFailed(true);
-      });
+    loadStyles(listRetryDelaysMs);
+    loadRecent(listRetryDelaysMs);
+  }, [status, loadStyles, loadRecent, listRetryDelaysMs]);
+
+  // Refresh also retries the styles when they didn't load.
+  const refreshLists = () => {
     loadRecent();
-    return () => {
-      cancelled = true;
-    };
-  }, [status, client, loadRecent]);
+    if (styleList.length === 0) loadStyles();
+  };
 
   const validate = () => {
     const promptIssue = checkPrompt(prompt);
@@ -361,8 +412,9 @@ export const App = ({
             codes={recent}
             canAdd={canAdd && !adding}
             onAdd={add}
-            onRefresh={loadRecent}
+            onRefresh={refreshLists}
             loading={recentLoading}
+            failed={recentFailed}
           />
         )}
 
