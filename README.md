@@ -24,7 +24,7 @@ be changed later on qrx.codes.
 
 ```bash
 npm install          # also copies .env.template to .env
-npm start            # development server on http://localhost:8080
+npm start            # development server on http://localhost:8081
 npm test             # Jest unit tests
 npm run lint         # ESLint with Canva's app rules
 npm run typecheck    # tsc
@@ -85,7 +85,13 @@ Prompts are checked with the same `obscenity` word filter the API uses before an
    `canva-app.json`).
 3. Add the auth provider with the values from `npm run portal-config`, then copy the Redirect URL Canva shows into
    the Clerk OAuth application.
-4. `npm start`, set **App source > Development URL** to `http://localhost:8080`, and click **Preview**.
+4. `npm start`, set **App source > Development URL** to `http://localhost:8081`, and click **Preview**.
+
+The dev server's port is `CANVA_FRONTEND_PORT` in `.env` (8081 by default). Any free port works, as long as the
+Development URL in the portal uses the same one.
+
+Chrome asks before a public page such as canva.com loads anything from `localhost` (Local Network Access). Allow it
+for Canva when Chrome prompts, or in the site settings for `https://www.canva.com`, or the app panel stays blank.
 
 The QRX API must allow the app's origin (`https://app-<appid>.canva-apps.com`) in CORS, including the
 `X-QRX-Authorization` header in `canva` mode, and the image host must allow it too.
