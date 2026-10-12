@@ -86,8 +86,8 @@ As in the ChatGPT reviewer runbook (`docs/distribution/chatgpt/SUBMISSION.md` in
 - The API prerequisites in the README are live on prod: CORS for the `QRX` app origin (and the `X-QRX-Authorization`
   header in `canva` mode), the `/canva/v1` routes if Canva asked for verification, image URLs Canva can upload, and
   style previews that load.
-- Decide on an image safety check (risk 7 in the scoping doc). If one is added, update the moderation answer in
-  [review-questionnaire.md](review-questionnaire.md); if not, submit the answer as written.
+- Image safety check: done (Azure AI Content Safety on prompts, logos and finished images, live on prod 13 Oct 2026),
+  as the moderation answer in [review-questionnaire.md](review-questionnaire.md) describes.
 - One code made end to end in the `QRX` app against prod, scanned with a phone.
 
 ## 8. Submit
