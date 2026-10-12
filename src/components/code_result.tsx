@@ -62,7 +62,12 @@ export const CodeResult = ({
           })}
         </Text>
       )}
-      {canAcceptPayments && (
+      {code.wifi && (
+        <Text size="small">
+          {intl.formatMessage(messages.joinsWifi, { ssid: code.wifi.ssid })}
+        </Text>
+      )}
+      {canAcceptPayments && code.type !== "wifi" && (
         <Text size="small">{intl.formatMessage(messages.changeLinkPaid)}</Text>
       )}
       <Text size="small" tone="tertiary">

@@ -16,20 +16,20 @@ the daily limit won't interrupt testing.
 ## About your app or platform (limit 400)
 
 ```
-QRX makes art QR codes: a picture that is also a working QR code. The app connects to the user's QRX account (qrx.codes), makes a code from a picture description and a link, checks that the finished image scans, and adds it to the design. Codes and their short links belong to the QRX account and also appear on qrx.codes. The app sells nothing and shows no prices.
+QRX makes art QR codes: a picture that is also a working QR code. The app connects to the user's QRX account (qrx.codes), makes a code from a picture description, a link or Wi-Fi network and an optional logo, checks that the finished image scans, and adds it to the design. Codes and their short links belong to the QRX account and also appear on qrx.codes. The app sells nothing and shows no prices.
 ```
 
 ## Testing steps (limit 1,000)
 
 ```
-1. Open the app in any design. Enter a picture description (e.g. "A lighthouse on a cliff at sunset") and a link (e.g. example.com).
-2. Select "Connect QRX and create", then Connect. Sign in with the test account from Login details and allow access.
+1. Open the app in any design. Enter a picture description (e.g. "A lighthouse on a cliff at sunset") and a link (e.g. example.com), or leave either blank: QRX fills in the example shown in the field.
+2. Select "Connect QRX and generate", then Connect. Sign in with the test account from Login details and allow access.
 3. A progress bar shows while the code is made, usually about a minute. QRX decodes the image to check it scans before returning it.
-4. Select "Add to design". Scan the code with a phone: it opens a qrx.to short link that forwards to the link you entered.
-5. Select one of the 11 styles before creating to change the look.
-6. "Recent codes" lists earlier codes; select one to add it to the design.
-7. "Disconnect QRX account" signs out; connecting again asks for the login.
-Edge cases: an empty field or a non-web link is refused before anything is sent; offensive words are refused; "Stop waiting" returns to the form and the code appears under "Recent codes" when done.
+4. Select "Add to design". Scan the code with a phone: it opens a qrx.to link that forwards to the link.
+5. Before generating, optionally choose a logo (PNG, JPEG, WebP or SVG) for the centre of the code, one of the 11 styles, or "Wi-Fi" under "When scanned" (the test plan has it).
+6. "Recent codes" lists earlier codes; select one to add it.
+7. "Disconnect QRX account" signs out.
+Edge cases: a non-web link, a file that isn't an image or a logo over 10 MB is refused; offensive words are refused; "Stop waiting" returns to the form.
 ```
 
 The walkthrough video link goes in **App walkthrough video link**; it is recorded with `tools/demo-video` in the qrxcodes repo (`npm run record -- canva-qrx`).

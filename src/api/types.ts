@@ -11,6 +11,8 @@ export type Code = {
   prompt: string;
   style: string | null;
   destination: string | null;
+  /** The network a Wi-Fi code joins; the password is never returned. */
+  wifi?: { ssid: string; security: string } | null;
   shortUrl: string | null;
   imageUrl: string | null;
   pageUrl: string;
@@ -37,10 +39,28 @@ export type StyleList = {
   data: Style[];
 };
 
+export type WifiSecurity = "wpa" | "wep";
+
 export type CreateCodeRequest = {
   prompt: string;
-  destination: string;
   style?: string;
+  /** A logo id from POST /logos, placed in the centre of the code. */
+  logo?: string;
+} & (
+  | { destination: string }
+  | { wifi: { ssid: string; password: string; security: WifiSecurity } }
+);
+
+export type Logo = {
+  id: string;
+  object: "logo";
+  createdAt: string;
+};
+
+/** What the account can do; only the parts the app reads. */
+export type Account = {
+  object: "account";
+  features: { wifiCodes: boolean; changeDestination: boolean };
 };
 
 /** RFC 9457 problem details, as the API returns them. */

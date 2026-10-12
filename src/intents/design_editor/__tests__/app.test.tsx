@@ -18,6 +18,8 @@ import {
 } from "src/utils/fake_qrx";
 import { renderInTestProvider } from "src/utils/test_render";
 import { DEFAULT_QRX_CONFIG } from "utils/qrx_config";
+import { EXAMPLE_DESCRIPTIONS } from "src/logic/example_descriptions";
+import { LogoError } from "src/logic/logo";
 import { App } from "../app";
 
 jest.mock("@canva/app-hooks");
@@ -44,11 +46,38 @@ const finishes = (overrides = {}) =>
   );
 
 const posts = (calls: Call[]) => calls.filter((c) => c.method === "POST");
+const codePosts = (calls: Call[]) =>
+  posts(calls).filter((c) => c.url.pathname.endsWith("/codes"));
+const account = (wifiCodes: boolean) =>
+  route("GET", "/canva/v1/account", () =>
+    jsonResponse(200, {
+      object: "account",
+      features: { wifiCodes, changeDestination: wifiCodes },
+    }),
+  );
+
+const LOGO = {
+  name: "logo.png",
+  dataUrl: "data:image/png;base64,iVBORw0KGgo=",
+  width: 64,
+  height: 64,
+};
+
+function chooseLogo(container: HTMLElement, name = "logo.png") {
+  const input = container.querySelector('input[type="file"]');
+  if (!input) throw new Error("No file input");
+  fireEvent.change(input, {
+    target: { files: [new File(["png"], name, { type: "image/png" })] },
+  });
+}
 
 function fillForm(prompt = "A lighthouse at dusk", link = "example.com/menu") {
-  fireEvent.change(screen.getByRole("textbox", { name: "Picture" }), {
-    target: { value: prompt },
-  });
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "Describe the picture" }),
+    {
+      target: { value: prompt },
+    },
+  );
   fireEvent.change(screen.getByRole("textbox", { name: /^Link/ }), {
     target: { value: link },
   });
@@ -80,10 +109,10 @@ describe("App", () => {
       <App oauth={fakeOauth()} config={config} fetchImpl={api.fetch} />,
     );
 
-    await screen.findByText("Style: No style");
+    await screen.findByRole("button", { name: "Cartoon" });
     fireEvent.click(screen.getByRole("button", { name: "Cartoon" }));
     fillForm();
-    fireEvent.click(screen.getByRole("button", { name: "Create QR code" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate code" }));
 
     expect(await screen.findByText("Your QR code is ready")).toBeTruthy();
     const [post] = posts(api.calls);
@@ -140,9 +169,9 @@ describe("App", () => {
       <App oauth={fakeOauth()} config={config} fetchImpl={api.fetch} />,
     );
 
-    await screen.findByText("Style: No style");
+    await screen.findByRole("button", { name: "Cartoon" });
     fillForm();
-    fireEvent.click(screen.getByRole("button", { name: "Create QR code" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate code" }));
 
     expect(await screen.findByRole("progressbar")).toBeTruthy();
     expect(
@@ -155,24 +184,279 @@ describe("App", () => {
     expect(await screen.findByText("Your QR code is ready")).toBeTruthy();
   });
 
-  it("checks the form before asking anyone to sign in", async () => {
+  it("fills a blank description and link with examples, as the web app does", async () => {
+    const api = fakeFetch(styles, recent([]), createProcessing, finishes());
+    renderInTestProvider(
+      <App
+        oauth={fakeOauth()}
+        config={config}
+        fetchImpl={api.fetch}
+        random={() => 0}
+      />,
+    );
+
+    const description = await screen.findByRole("textbox", {
+      name: "Describe the picture",
+    });
+    const [first, second] = EXAMPLE_DESCRIPTIONS;
+    expect(description.getAttribute("placeholder")).toBe(first);
+    expect(
+      screen
+        .getByRole("textbox", { name: /^Link/ })
+        .getAttribute("placeholder"),
+    ).toBe("https://qrx.codes/example");
+    expect(
+      screen.getByText(/Leave blank and we’ll write one for you\./),
+    ).toBeTruthy();
+
+    await screen.findByRole("button", { name: "Cartoon" });
+    fireEvent.click(screen.getByRole("button", { name: "Generate code" }));
+
+    expect(await screen.findByText("Your QR code is ready")).toBeTruthy();
+    expect(codePosts(api.calls)[0]?.body).toEqual({
+      prompt: first,
+      destination: "https://qrx.codes/example",
+    });
+
+    // back on the form, the description is blank again with the next example
+    fireEvent.click(screen.getByRole("button", { name: "Create another" }));
+    const again = screen.getByRole("textbox", { name: "Describe the picture" });
+    expect((again as HTMLTextAreaElement).value).toBe("");
+    expect(again.getAttribute("placeholder")).toBe(second);
+  });
+
+  it("checks the link before asking anyone to sign in", async () => {
     const oauth = fakeOauth(null);
     const api = fakeFetch();
     renderInTestProvider(
       <App oauth={oauth} config={config} fetchImpl={api.fetch} />,
     );
 
-    const button = await screen.findByRole("button", {
-      name: "Connect QRX and create",
+    await screen.findByRole("button", { name: "Connect QRX and generate" });
+    fireEvent.change(screen.getByRole("textbox", { name: /^Link/ }), {
+      target: { value: "mailto:a@example.com" },
     });
-    fireEvent.click(button);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Connect QRX and generate" }),
+    );
 
     expect(
-      await screen.findByText("Describe the picture you want."),
+      await screen.findByText("Enter a web address, such as example.com/menu."),
     ).toBeTruthy();
-    expect(screen.getByText("Add the link the code should open.")).toBeTruthy();
+    // the blank description isn't filled in until the form can be sent
+    expect(
+      (
+        screen.getByRole("textbox", {
+          name: "Describe the picture",
+        }) as HTMLTextAreaElement
+      ).value,
+    ).toBe("");
     expect(oauth.requestAuthorization).not.toHaveBeenCalled();
     expect(api.calls).toHaveLength(0);
+  });
+
+  it("uploads a chosen logo and sends its id with the code", async () => {
+    const api = fakeFetch(
+      styles,
+      recent([]),
+      route("POST", "/canva/v1/logos", () =>
+        jsonResponse(201, {
+          id: "3f2b8c1e-7d4a-4f6b-9c2e-5a1d8e7f3b20",
+          object: "logo",
+          createdAt: "2026-10-13T00:00:00.000Z",
+        }),
+      ),
+      createProcessing,
+      finishes(),
+    );
+    const prepareLogo = jest.fn(async () => LOGO);
+    const { container } = renderInTestProvider(
+      <App
+        oauth={fakeOauth()}
+        config={config}
+        fetchImpl={api.fetch}
+        prepareLogo={prepareLogo}
+      />,
+    );
+
+    await screen.findByRole("button", { name: "Cartoon" });
+    expect(screen.getByText("PNG, JPEG, WebP or SVG")).toBeTruthy();
+    chooseLogo(container);
+    expect(
+      await screen.findByText("Placed in the centre of the code"),
+    ).toBeTruthy();
+    expect(screen.getByText("logo.png")).toBeTruthy();
+    fillForm();
+    fireEvent.click(screen.getByRole("button", { name: "Generate code" }));
+
+    expect(await screen.findByText("Your QR code is ready")).toBeTruthy();
+    const [upload, create] = posts(api.calls);
+    expect(upload?.url.pathname).toBe("/canva/v1/logos");
+    expect(upload?.body).toEqual({ image: LOGO.dataUrl });
+    expect(create?.body).toEqual({
+      prompt: "A lighthouse at dusk",
+      destination: "https://example.com/menu",
+      logo: "3f2b8c1e-7d4a-4f6b-9c2e-5a1d8e7f3b20",
+    });
+  });
+
+  it("removes a chosen logo", async () => {
+    const api = fakeFetch(styles, recent([]), createProcessing, finishes());
+    const { container } = renderInTestProvider(
+      <App
+        oauth={fakeOauth()}
+        config={config}
+        fetchImpl={api.fetch}
+        prepareLogo={async () => LOGO}
+      />,
+    );
+
+    await screen.findByRole("button", { name: "Cartoon" });
+    chooseLogo(container);
+    fireEvent.click(await screen.findByRole("button", { name: "Remove logo" }));
+    expect(screen.queryByText("logo.png")).toBeNull();
+    fillForm();
+    fireEvent.click(screen.getByRole("button", { name: "Generate code" }));
+
+    await screen.findByText("Your QR code is ready");
+    expect(posts(api.calls).map((c) => c.url.pathname)).toEqual([
+      "/canva/v1/codes",
+    ]);
+  });
+
+  it("turns away a logo that is too large, before or after it is sent", async () => {
+    const api = fakeFetch(
+      styles,
+      recent([]),
+      route("POST", "/canva/v1/logos", () =>
+        problem(413, "payload-too-large", "The logo is larger than 10 MB."),
+      ),
+    );
+    let tooLarge = true;
+    const { container } = renderInTestProvider(
+      <App
+        oauth={fakeOauth()}
+        config={config}
+        fetchImpl={api.fetch}
+        prepareLogo={async () => {
+          if (tooLarge) throw new LogoError("too-large");
+          return LOGO;
+        }}
+      />,
+    );
+
+    await screen.findByRole("button", { name: "Cartoon" });
+    chooseLogo(container);
+    expect(
+      await screen.findByText("This image is too large; choose a smaller one"),
+    ).toBeTruthy();
+
+    tooLarge = false;
+    chooseLogo(container);
+    await screen.findByText("logo.png");
+    fillForm();
+    fireEvent.click(screen.getByRole("button", { name: "Generate code" }));
+
+    expect(
+      await screen.findByText("This image is too large; choose a smaller one"),
+    ).toBeTruthy();
+    expect(codePosts(api.calls)).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Generate code" })).toBeTruthy();
+  });
+
+  it("refuses a file that isn't an image", async () => {
+    const api = fakeFetch(styles, recent([]));
+    const { container } = renderInTestProvider(
+      <App
+        oauth={fakeOauth()}
+        config={config}
+        fetchImpl={api.fetch}
+        prepareLogo={async () => {
+          throw new LogoError("type");
+        }}
+      />,
+    );
+
+    await screen.findByRole("button", { name: "Cartoon" });
+    chooseLogo(container);
+    expect(
+      await screen.findByText("Choose a PNG, JPEG, WebP or SVG image"),
+    ).toBeTruthy();
+  });
+
+  it("makes a Wi-Fi code on a plan that has them", async () => {
+    const wifiCode = {
+      type: "wifi",
+      destination: null,
+      shortUrl: null,
+      wifi: { ssid: "Cafe Guest", security: "wpa" },
+    };
+    const api = fakeFetch(
+      styles,
+      recent([]),
+      account(true),
+      route("POST", "/canva/v1/codes", () =>
+        jsonResponse(
+          202,
+          makeCode({ status: "processing", imageUrl: null, ...wifiCode }),
+        ),
+      ),
+      finishes(wifiCode),
+    );
+    renderInTestProvider(
+      <App oauth={fakeOauth()} config={config} fetchImpl={api.fetch} />,
+    );
+
+    await screen.findByRole("button", { name: "Cartoon" });
+    const wifi = await screen.findByRole("radio", { name: "Wi-Fi" });
+    await waitFor(() =>
+      expect(wifi.getAttribute("aria-disabled")).not.toBe("true"),
+    );
+    fireEvent.click(wifi);
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate code" }));
+    expect(await screen.findAllByText("This is required.")).toHaveLength(2);
+    expect(codePosts(api.calls)).toHaveLength(0);
+
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Network name (SSID)" }),
+      { target: { value: "Cafe Guest" } },
+    );
+    fireEvent.change(screen.getByRole("textbox", { name: "Password" }), {
+      target: { value: "espresso42" },
+    });
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Describe the picture" }),
+      { target: { value: "A cosy café" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Generate code" }));
+
+    expect(await screen.findByText("Your QR code is ready")).toBeTruthy();
+    expect(codePosts(api.calls)[0]?.body).toEqual({
+      prompt: "A cosy café",
+      wifi: { ssid: "Cafe Guest", password: "espresso42", security: "wpa" },
+    });
+    expect(
+      screen.getByText("Joins the Wi-Fi network Cafe Guest."),
+    ).toBeTruthy();
+  });
+
+  it("offers Wi-Fi only on a plan that has it, naming the plan where payments are allowed", async () => {
+    jest.mocked(getPlatformInfo).mockReturnValue({ canAcceptPayments: true });
+    const api = fakeFetch(styles, recent([]), account(false));
+    renderInTestProvider(
+      <App oauth={fakeOauth()} config={config} fetchImpl={api.fetch} />,
+    );
+
+    await screen.findByRole("button", { name: "Cartoon" });
+    expect(
+      screen
+        .getByRole("radio", { name: "Wi-Fi" })
+        .getAttribute("aria-disabled"),
+    ).toBe("true");
+    expect(
+      await screen.findByText("Wi-Fi codes come with the Starter plan."),
+    ).toBeTruthy();
   });
 
   it("connects a QRX account, then makes the code", async () => {
@@ -182,10 +466,10 @@ describe("App", () => {
       <App oauth={oauth} config={config} fetchImpl={api.fetch} />,
     );
 
-    await screen.findByRole("button", { name: "Connect QRX and create" });
+    await screen.findByRole("button", { name: "Connect QRX and generate" });
     fillForm();
     fireEvent.click(
-      screen.getByRole("button", { name: "Connect QRX and create" }),
+      screen.getByRole("button", { name: "Connect QRX and generate" }),
     );
 
     expect(await screen.findByText("Your QR code is ready")).toBeTruthy();
@@ -206,10 +490,10 @@ describe("App", () => {
       />,
     );
 
-    await screen.findByRole("button", { name: "Connect QRX and create" });
+    await screen.findByRole("button", { name: "Connect QRX and generate" });
     fillForm();
     fireEvent.click(
-      screen.getByRole("button", { name: "Connect QRX and create" }),
+      screen.getByRole("button", { name: "Connect QRX and generate" }),
     );
 
     await screen.findByText("Your QR code is ready");
@@ -231,16 +515,16 @@ describe("App", () => {
       <App oauth={oauth} config={config} fetchImpl={api.fetch} />,
     );
 
-    await screen.findByRole("button", { name: "Connect QRX and create" });
+    await screen.findByRole("button", { name: "Connect QRX and generate" });
     fillForm();
     fireEvent.click(
-      screen.getByRole("button", { name: "Connect QRX and create" }),
+      screen.getByRole("button", { name: "Connect QRX and generate" }),
     );
 
     await waitFor(() => expect(oauth.requestAuthorization).toHaveBeenCalled());
     expect(posts(api.calls)).toHaveLength(0);
     expect(
-      screen.getByRole("button", { name: "Connect QRX and create" }),
+      screen.getByRole("button", { name: "Connect QRX and generate" }),
     ).toBeTruthy();
   });
 
@@ -271,7 +555,7 @@ describe("App", () => {
       />,
     );
 
-    expect(await screen.findByText("Style: No style")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Cartoon" })).toBeTruthy();
     expect(
       await screen.findAllByRole("button", {
         name: "Add this QR code to the design",
@@ -321,7 +605,7 @@ describe("App", () => {
     failing = false;
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
 
-    expect(await screen.findByText("Style: No style")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Cartoon" })).toBeTruthy();
     expect(
       await screen.findAllByRole("button", {
         name: "Add this QR code to the design",
@@ -340,9 +624,9 @@ describe("App", () => {
       <App oauth={fakeOauth()} config={config} fetchImpl={api.fetch} />,
     );
 
-    await screen.findByText("Style: No style");
+    await screen.findByRole("button", { name: "Cartoon" });
     fillForm("a shitty lighthouse");
-    fireEvent.click(screen.getByRole("button", { name: "Create QR code" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate code" }));
 
     expect(
       await screen.findByText(
@@ -362,9 +646,9 @@ describe("App", () => {
       <App oauth={fakeOauth()} config={config} fetchImpl={api.fetch} />,
     );
 
-    await screen.findByText("Style: No style");
+    await screen.findByRole("button", { name: "Cartoon" });
     fillForm();
-    fireEvent.click(screen.getByRole("button", { name: "Create QR code" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate code" }));
 
     expect(
       await screen.findByText("You've used all of today's codes."),
@@ -386,9 +670,9 @@ describe("App", () => {
       <App oauth={fakeOauth()} config={config} fetchImpl={api.fetch} />,
     );
 
-    await screen.findByText("Style: No style");
+    await screen.findByRole("button", { name: "Cartoon" });
     fillForm();
-    fireEvent.click(screen.getByRole("button", { name: "Create QR code" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate code" }));
 
     fireEvent.click(
       await screen.findByRole("button", { name: "See plans on qrx.codes" }),
@@ -405,9 +689,9 @@ describe("App", () => {
       <App oauth={fakeOauth()} config={config} fetchImpl={api.fetch} />,
     );
 
-    await screen.findByText("Style: No style");
+    await screen.findByRole("button", { name: "Cartoon" });
     fillForm();
-    fireEvent.click(screen.getByRole("button", { name: "Create QR code" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate code" }));
 
     expect(
       await screen.findByText(/On a paid plan, you can change where this code/),
@@ -425,9 +709,9 @@ describe("App", () => {
       <App oauth={fakeOauth()} config={config} fetchImpl={api.fetch} />,
     );
 
-    await screen.findByText("Style: No style");
+    await screen.findByRole("button", { name: "Cartoon" });
     fillForm();
-    fireEvent.click(screen.getByRole("button", { name: "Create QR code" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate code" }));
 
     expect(
       await screen.findByText(
@@ -447,9 +731,9 @@ describe("App", () => {
       <App oauth={fakeOauth()} config={config} fetchImpl={api.fetch} />,
     );
 
-    await screen.findByText("Style: No style");
+    await screen.findByRole("button", { name: "Cartoon" });
     fillForm();
-    fireEvent.click(screen.getByRole("button", { name: "Create QR code" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate code" }));
 
     expect(
       await screen.findByText(
@@ -457,7 +741,7 @@ describe("App", () => {
       ),
     ).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: "Connect QRX and create" }),
+      screen.getByRole("button", { name: "Connect QRX and generate" }),
     ).toBeTruthy();
   });
 
@@ -491,7 +775,7 @@ describe("App", () => {
 
     await waitFor(() => expect(oauth.deauthorize).toHaveBeenCalled());
     expect(
-      await screen.findByRole("button", { name: "Connect QRX and create" }),
+      await screen.findByRole("button", { name: "Connect QRX and generate" }),
     ).toBeTruthy();
   });
 });

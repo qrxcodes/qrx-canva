@@ -19,6 +19,7 @@ declare global {
 const params = new URLSearchParams(window.location.search);
 const theme = params.get("theme") === "dark" ? "dark" : "light";
 const signedIn = params.get("signedIn") !== "0";
+const wifiCodes = params.get("wifi") === "1";
 window.harnessPayments = params.get("payments") === "1";
 
 const asset = (path: string) => new URL(path, window.location.href).toString();
@@ -97,6 +98,22 @@ const fakeFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const method = init?.method ?? "GET";
   if (url.pathname.endsWith("/styles")) {
     return json({ object: "list", data: styles, hasMore: false });
+  }
+  if (url.pathname.endsWith("/account")) {
+    return json({
+      object: "account",
+      features: { wifiCodes, changeDestination: wifiCodes },
+    });
+  }
+  if (method === "POST" && url.pathname.endsWith("/logos")) {
+    return json(
+      {
+        id: "3f2b8c1e-7d4a-4f6b-9c2e-5a1d8e7f3b20",
+        object: "logo",
+        createdAt: "2026-10-13T00:00:00.000Z",
+      },
+      201,
+    );
   }
   if (method === "POST") {
     const body = JSON.parse(String(init?.body)) as { prompt: string };

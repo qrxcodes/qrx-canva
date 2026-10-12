@@ -43,9 +43,13 @@ export function useAddToDesign() {
           type: "image",
           ref: asset.ref,
           altText: {
-            text: intl.formatMessage(messages.designAltText, {
-              link: linkForAltText(code),
-            }),
+            text: code.wifi
+              ? intl.formatMessage(messages.designAltTextWifi, {
+                  ssid: code.wifi.ssid,
+                })
+              : intl.formatMessage(messages.designAltText, {
+                  link: linkForAltText(code),
+                }),
             decorative: false,
           },
         });

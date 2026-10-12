@@ -260,6 +260,62 @@ describe("QrxClient", () => {
     ).rejects.toMatchObject({ kind: "daily-limit" });
     expect(api.calls).toHaveLength(1);
   });
+
+  it("uploads a logo as JSON and answers with its id", async () => {
+    const logo = { id: "3f2b8c1e", object: "logo", createdAt: "x" };
+    const api = fakeFetch(
+      route("POST", "/canva/v1/logos", () => jsonResponse(201, logo)),
+    );
+    const client = new QrxClient({
+      config: canvaConfig,
+      tokens: tokens(),
+      fetch: api.fetch,
+    });
+
+    await expect(
+      client.uploadLogo("data:image/png;base64,AAAA"),
+    ).resolves.toEqual(logo);
+    expect(api.calls[0]?.body).toEqual({ image: "data:image/png;base64,AAAA" });
+    expect(api.calls[0]?.headers["Content-Type"]).toBe("application/json");
+  });
+
+  it("keeps the status of a refused logo, so a 413 can be told apart", async () => {
+    const api = fakeFetch(
+      route("POST", "/canva/v1/logos", () =>
+        problem(413, "payload-too-large", "The logo is larger than 10 MB."),
+      ),
+    );
+    const client = new QrxClient({
+      config: canvaConfig,
+      tokens: tokens(),
+      fetch: api.fetch,
+    });
+
+    await expect(client.uploadLogo("x")).rejects.toMatchObject({
+      status: 413,
+      kind: "invalid-request",
+    });
+  });
+
+  it("reads the account's features", async () => {
+    const api = fakeFetch(
+      route("GET", "/canva/v1/account", () =>
+        jsonResponse(200, {
+          object: "account",
+          features: { wifiCodes: true, changeDestination: true },
+        }),
+      ),
+    );
+    const client = new QrxClient({
+      config: canvaConfig,
+      tokens: tokens(),
+      fetch: api.fetch,
+    });
+
+    await expect(client.getAccount()).resolves.toMatchObject({
+      features: { wifiCodes: true },
+    });
+  });
 });
 
 describe("problemName", () => {

@@ -1,7 +1,11 @@
 import { fireEvent, screen } from "@testing-library/react";
 import type { Style } from "src/api/types";
 import { recentCodesToShow } from "src/components/recent_codes";
-import { isNoStyle, StylePicker } from "src/components/style_picker";
+import {
+  isNoStyle,
+  orderStyles,
+  StylePicker,
+} from "src/components/style_picker";
 import { linkForAltText } from "src/hooks/use_add_to_design";
 import { makeCode, STYLES } from "src/utils/fake_qrx";
 import { renderInTestProvider } from "src/utils/test_render";
@@ -16,7 +20,7 @@ const NO_STYLE: Style = {
 };
 
 describe("StylePicker", () => {
-  it("treats the API's No Style entry as no style", () => {
+  it("lists the API's No Style entry first, as None, and sends no style for it", () => {
     const onChange = jest.fn();
     renderInTestProvider(
       <StylePicker
@@ -26,21 +30,37 @@ describe("StylePicker", () => {
       />,
     );
 
-    expect(screen.getByText("Style: Anime")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "No style" }));
+    // the chosen style is named beside the label, and under its tile
+    expect(screen.getAllByText("Anime")).toHaveLength(2);
+    const tiles = screen.getAllByRole("button");
+    expect(tiles[0]?.getAttribute("aria-label")).toBe("None");
+    fireEvent.click(screen.getByRole("button", { name: "None" }));
     expect(onChange).toHaveBeenCalledWith("");
+    expect(
+      screen.getByText(
+        "With None, describe the look you want in the description.",
+      ),
+    ).toBeTruthy();
   });
 
-  it("clears the style when the chosen one is selected again", () => {
+  it("chooses styles like radio buttons", () => {
     const onChange = jest.fn();
     renderInTestProvider(
       <StylePicker styleList={STYLES} value="a64c5" onChange={onChange} />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Anime" }));
-    expect(onChange).toHaveBeenCalledWith("");
+    expect(onChange).toHaveBeenCalledWith("a64c5");
     fireEvent.click(screen.getByRole("button", { name: "Cartoon" }));
     expect(onChange).toHaveBeenLastCalledWith("06184");
+  });
+
+  it("orders None first and keeps the rest in the API's order", () => {
+    expect(orderStyles([...STYLES, NO_STYLE]).map((s) => s.id)).toEqual([
+      "Noop",
+      "a64c5",
+      "06184",
+    ]);
   });
 
   it("falls back to a list when a style has no preview", () => {
@@ -64,14 +84,15 @@ describe("StylePicker", () => {
 });
 
 describe("recentCodesToShow", () => {
-  it("keeps finished link codes with an image", () => {
+  it("keeps finished link and Wi-Fi codes with an image", () => {
     const codes = [
       makeCode({ id: "a" }),
       makeCode({ id: "b", status: "processing", imageUrl: null }),
       makeCode({ id: "c", status: "failed", imageUrl: null }),
       makeCode({ id: "d", type: "other", shortUrl: null }),
+      makeCode({ id: "e", type: "wifi", shortUrl: null, destination: null }),
     ];
-    expect(recentCodesToShow(codes).map((code) => code.id)).toEqual(["a"]);
+    expect(recentCodesToShow(codes).map((code) => code.id)).toEqual(["a", "e"]);
   });
 });
 

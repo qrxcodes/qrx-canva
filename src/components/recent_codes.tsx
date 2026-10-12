@@ -25,7 +25,9 @@ type Props = {
 export function recentCodesToShow(codes: Code[]): Code[] {
   return codes.filter(
     (code) =>
-      code.status === "succeeded" && code.type === "url" && code.imageUrl,
+      code.status === "succeeded" &&
+      (code.type === "url" || code.type === "wifi") &&
+      code.imageUrl,
   );
 }
 
