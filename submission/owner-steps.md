@@ -50,7 +50,7 @@ For each app:
 ## 4. Test in the editor (dev app)
 
 1. `npm install`, check `.env` (dev API base, the dev app's ID and origin), `npm start`.
-2. In `QRX dev`: **App source > Development URL** = `http://localhost:8080`, then **Preview**.
+2. In `QRX dev`: **App source > Development URL** = `http://localhost:8081` (or the port in `CANVA_FRONTEND_PORT`), then **Preview**.
 3. Go through [testing-instructions.md](testing-instructions.md) with a dev QRX account, plus:
    - **Token audience.** Canva adds `resource=https://dev.qrx.codes/v1` to the authorise URL, but its token request
      follows RFC 6749 and won't carry `resource`. If the first API call answers `401 invalid_token`, Clerk didn't put
