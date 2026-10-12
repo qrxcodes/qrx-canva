@@ -2,7 +2,7 @@
 
 Canva sends its questionnaire in the review ticket after submission, and its exact questions aren't published. These
 answers cover what it and the submission checklist ask about. Keep them factual: describe only what is in place on
-the day of submission, and update the moderation answer if the owner adds an image check first.
+the day of submission.
 
 ## The app
 
@@ -78,22 +78,24 @@ AI. Nothing in the app suggests the images are made by a person.
 
 **What moderation is in place?**
 - **Prompts are word-filtered.** The app checks the description with the `obscenity` English word list (the same
-  filter Canva's generative AI template uses) before sending it, and the QRX API runs the same filter on every
-  request and refuses matching prompts.
-- **There is no check of the finished image for unsafe content yet.** The only check on the output is the scan check
-  (the image is decoded to confirm the QR code opens the right link). The production image model doesn't apply a
-  negative prompt. QRX is deciding whether to add an image safety check; until one is live, the word filter is the
-  only content safeguard.
-- **Logos are the user's own images.** A chosen logo is placed in the centre of the code as given; it isn't checked
-  for content.
+  filter Canva's generative AI template uses) before sending it, and the QRX API runs the same filter on every request.
+- **Every generation is checked by Azure AI Content Safety.** The QRX API rates the description, and the prompt the
+  image model is given, for sexual, violent, hateful and self-harm content. A prompt that reaches the threshold
+  (any sexual content, or medium severity for the other categories) is replaced by a safe scene before anything is
+  drawn.
+- **Logos and finished images are checked too.** An uploaded logo that fails the check is left out of the code and
+  deleted. Every finished image is checked before it is stored at a public address or returned to Canva; a failing
+  image is discarded and drawn again from a safe scene, so an unsafe image is never shown.
+- **Severe cases are logged for review.** QRX's monitoring records each moderated generation, without the prompt text.
+- **Logos are the user's own images.** A logo that passes the check is placed in the centre of the code as given.
 - **Reporting.** Under each finished code, the panel links to Canva's report form ("Something not right with an image?
   Report it"). Users can also contact QRX through https://qrx.codes/support.
 
 **Can the app generate the content Canva's terms prohibit (nudity, political or election content, medical, legal or
 financial advice, code, malware)?**
-The app only makes pictures, so it produces no advice, contracts or code. For images, the word filter blocks explicit
-and offensive terms in the description; it does not detect political subjects, and there is no output check, as
-above.
+The app only makes pictures, so it produces no advice, contracts or code. For images, the word filter and Azure AI Content Safety
+keep out sexual, violent, hateful and self-harm content in the description, the logo and the finished picture, as
+above. They don't detect political subjects.
 
 ## Reliability
 
