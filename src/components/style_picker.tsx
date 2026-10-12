@@ -1,4 +1,6 @@
 import {
+  Column,
+  Columns,
   FormField,
   Grid,
   ImageCard,
@@ -28,9 +30,15 @@ export function isNoStyle(style: Style): boolean {
 /** The id to send for a tile: "" for the no-style tile. */
 export const styleValue = (style: Style) => (isNoStyle(style) ? "" : style.id);
 
+/** None first, the rest in the API's order, as the QRX web app lists them. */
+export const orderStyles = (list: readonly Style[]) => [
+  ...list.filter(isNoStyle),
+  ...list.filter((style) => !isNoStyle(style)),
+];
+
 /**
- * Style choice as a grid of previews, or as a plain list when previews
- * can't be shown.
+ * Style choice as a grid of previews, chosen like radio buttons and starting
+ * with None, or as a plain list when previews can't be shown.
  */
 export const StylePicker = ({
   styleList,
@@ -43,7 +51,13 @@ export const StylePicker = ({
   const noStyleName = intl.formatMessage(messages.styleNone);
   const nameOf = (style: Style) =>
     isNoStyle(style) ? noStyleName : style.name;
-  const selected = styleList.find((style) => style.id === value);
+  const ordered = orderStyles(styleList);
+  const selected = ordered.find((style) => styleValue(style) === value);
+  const hint = (
+    <Text size="small" tone="tertiary">
+      {intl.formatMessage(messages.styleHint)}
+    </Text>
+  );
 
   const showPreviews =
     !previewsFailed && styleList.every((style) => style.previewUrl);
@@ -56,31 +70,41 @@ export const StylePicker = ({
         .map((style) => ({ value: style.id, label: style.name })),
     ];
     return (
-      <FormField
-        label={intl.formatMessage(messages.styleLabel)}
-        value={value}
-        control={(props) => (
-          <Select
-            {...props}
-            options={options}
-            onChange={onChange}
-            disabled={disabled}
-            stretch
-          />
-        )}
-      />
+      <Rows spacing="1u">
+        <FormField
+          label={intl.formatMessage(messages.styleLabel)}
+          value={value}
+          control={(props) => (
+            <Select
+              {...props}
+              options={options}
+              onChange={onChange}
+              disabled={disabled}
+              stretch
+            />
+          )}
+        />
+        {hint}
+      </Rows>
     );
   }
 
   return (
     <Rows spacing="1u">
-      <Text variant="bold" size="small">
-        {intl.formatMessage(messages.styleChosen, {
-          name: selected ? nameOf(selected) : noStyleName,
-        })}
-      </Text>
+      <Columns spacing="1u" alignY="center">
+        <Column>
+          <Text variant="bold" size="small">
+            {intl.formatMessage(messages.styleLabel)}
+          </Text>
+        </Column>
+        <Column width="content">
+          <Text size="small" tone="tertiary">
+            {selected ? nameOf(selected) : noStyleName}
+          </Text>
+        </Column>
+      </Columns>
       <Grid columns={3} spacing="1u">
-        {styleList.map((style) => {
+        {ordered.map((style) => {
           const tileValue = styleValue(style);
           const name = nameOf(style);
           return (
@@ -97,7 +121,7 @@ export const StylePicker = ({
                 onImageLoad={(state) => {
                   if (state === "error") setPreviewsFailed(true);
                 }}
-                onClick={() => onChange(tileValue === value ? "" : tileValue)}
+                onClick={() => onChange(tileValue)}
               />
               <Text size="xsmall" alignment="center" lineClamp={1}>
                 {name}
@@ -106,6 +130,7 @@ export const StylePicker = ({
           );
         })}
       </Grid>
+      {hint}
     </Rows>
   );
 };

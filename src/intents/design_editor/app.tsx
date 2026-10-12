@@ -4,19 +4,21 @@ import {
   MultilineInput,
   Rows,
   Text,
-  TextInput,
 } from "@canva/app-ui-kit";
 import { getPlatformInfo, requestOpenExternalUrl } from "@canva/platform";
 import type { Oauth } from "@canva/user";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { QrxApiError, QrxClient } from "src/api/qrx_client";
-import type { Code, Style } from "src/api/types";
+import type { Code, CreateCodeRequest, Style } from "src/api/types";
 import { useQrxAuth } from "src/auth/use_qrx_auth";
 import { CodeResult } from "src/components/code_result";
 import { ErrorAlert } from "src/components/error_alert";
 import { GenerationProgress } from "src/components/generation_progress";
+import { LogoField } from "src/components/logo_field";
 import { RecentCodes } from "src/components/recent_codes";
+import type { ScanValues } from "src/components/scan_fields";
+import { ScanFields } from "src/components/scan_fields";
 import { StylePicker } from "src/components/style_picker";
 import type { QrxConfig } from "src/config";
 import {
@@ -29,9 +31,21 @@ import {
 import { useAddToDesign } from "src/hooks/use_add_to_design";
 import type { ErrorView } from "src/logic/errors";
 import { CodeFailedError, describeError } from "src/logic/errors";
+import { exampleUrlFor, pickExample, planPrefill } from "src/logic/examples";
 import { generateCode, newIdempotencyKey } from "src/logic/generation";
-import type { LinkProblem, PromptProblem } from "src/logic/validation";
-import { checkLink, checkPrompt, normaliseLink } from "src/logic/validation";
+import type { PreparedLogo } from "src/logic/logo";
+import { prepareLogo as defaultPrepareLogo } from "src/logic/logo";
+import type {
+  LinkProblem,
+  PromptProblem,
+  WifiProblems,
+} from "src/logic/validation";
+import {
+  checkLink,
+  checkPrompt,
+  checkWifi,
+  normaliseLink,
+} from "src/logic/validation";
 import { messages } from "src/messages";
 import * as styles from "styles/components.css";
 
@@ -41,16 +55,29 @@ type Phase =
   | { kind: "result"; code: Code };
 
 const PROMPT_ERRORS = {
-  missing: messages.promptMissing,
+  missing: messages.required,
   "too-long": messages.promptTooLong,
   "blocked-words": messages.promptBlocked,
 } satisfies Record<PromptProblem, unknown>;
 
 const LINK_ERRORS = {
-  missing: messages.linkMissing,
+  missing: messages.required,
   invalid: messages.linkInvalid,
   "too-long": messages.linkTooLong,
 } satisfies Record<LinkProblem, unknown>;
+
+type FormProblems = {
+  prompt?: PromptProblem;
+  link?: LinkProblem;
+} & WifiProblems;
+
+const EMPTY_SCAN: ScanValues = {
+  kind: "link",
+  link: "",
+  ssid: "",
+  password: "",
+  security: "wpa",
+};
 
 const isAbort = (error: unknown) =>
   error instanceof Error && error.name === "AbortError";
@@ -88,6 +115,10 @@ export type AppProps = {
   now?: () => number;
   /** For tests: the pauses between retries of the first loads. */
   listRetryDelaysMs?: readonly number[];
+  /** For tests: reads a chosen logo file (with the browser's canvas otherwise). */
+  prepareLogo?: (file: File) => Promise<PreparedLogo>;
+  /** For tests: picks the example descriptions. */
+  random?: () => number;
 };
 
 export const App = ({
@@ -96,6 +127,8 @@ export const App = ({
   fetchImpl,
   now = Date.now,
   listRetryDelaysMs = LIST_RETRY_DELAYS_MS,
+  prepareLogo = defaultPrepareLogo,
+  random = Math.random,
 }: AppProps) => {
   const intl = useIntl();
   const qrxAuth = useQrxAuth(oauth, config);
@@ -108,10 +141,18 @@ export const App = ({
   const canAcceptPayments = getPlatformInfo().canAcceptPayments;
 
   const [prompt, setPrompt] = useState("");
-  const [link, setLink] = useState("");
+  const [scan, setScan] = useState<ScanValues>(EMPTY_SCAN);
   const [styleId, setStyleId] = useState("");
-  const [promptProblem, setPromptProblem] = useState<PromptProblem>();
-  const [linkProblem, setLinkProblem] = useState<LinkProblem>();
+  const [logo, setLogo] = useState<PreparedLogo | null>(null);
+  const [logoError, setLogoError] = useState<string>();
+  const [problems, setProblems] = useState<FormProblems>({});
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [canUseWifi, setCanUseWifi] = useState(false);
+  // the example a blank description is filled with, shown as its placeholder
+  const [shownExample, setShownExample] = useState(() =>
+    pickExample(null, random),
+  );
+  const filledExample = useRef<string | null>(null);
   const [phase, setPhase] = useState<Phase>({ kind: "form" });
   const [error, setError] = useState<ErrorView | null>(null);
   const [styleList, setStyleList] = useState<Style[]>([]);
@@ -121,6 +162,9 @@ export const App = ({
   const [recentFailed, setRecentFailed] = useState(false);
   const [adding, setAdding] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  const exampleUrl = exampleUrlFor(config.siteUrl);
+  const kind = canUseWifi ? scan.kind : "link";
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -180,16 +224,27 @@ export const App = ({
     [client, markSignedOut],
   );
 
+  // Wi-Fi codes need a plan that has them; without an answer, links only.
+  const loadAccount = useCallback(async () => {
+    try {
+      setCanUseWifi((await client.getAccount()).features?.wifiCodes === true);
+    } catch {
+      setCanUseWifi(false);
+    }
+  }, [client]);
+
   useEffect(() => {
     if (status !== "signed-in") {
       setStyleList([]);
       setRecent([]);
       setRecentFailed(false);
+      setCanUseWifi(false);
       return;
     }
     loadStyles(listRetryDelaysMs);
     loadRecent(listRetryDelaysMs);
-  }, [status, loadStyles, loadRecent, listRetryDelaysMs]);
+    loadAccount();
+  }, [status, loadStyles, loadRecent, loadAccount, listRetryDelaysMs]);
 
   // Refresh also retries the styles when they didn't load.
   const refreshLists = () => {
@@ -197,12 +252,56 @@ export const App = ({
     if (styleList.length === 0) loadStyles();
   };
 
-  const validate = () => {
-    const promptIssue = checkPrompt(prompt);
-    const linkIssue = checkLink(link);
-    setPromptProblem(promptIssue);
-    setLinkProblem(linkIssue);
-    return !promptIssue && !linkIssue;
+  const setScanValue = <K extends keyof ScanValues>(
+    key: K,
+    value: ScanValues[K],
+  ) => {
+    setScan((current) => ({ ...current, [key]: value }));
+    setProblems((current) => ({
+      ...current,
+      ...(key === "link" ? { link: undefined } : {}),
+      ...(key === "ssid" ? { ssid: undefined } : {}),
+      ...(key === "password" ? { password: undefined } : {}),
+    }));
+  };
+
+  /**
+   * Fills a blank description with the example shown in it, and a blank link
+   * with the example page, as the QRX web app does; then checks the form.
+   * Returns what to send, or undefined when something needs fixing, in which
+   * case the blank fields stay blank, still showing their examples.
+   */
+  const fillAndCheck = () => {
+    const plan = planPrefill(
+      { prompt, link: scan.link, kind },
+      { description: shownExample, url: exampleUrl },
+    );
+    const filledPrompt = plan.prompt ?? prompt;
+    const filledLink = plan.link ?? scan.link;
+
+    const found: FormProblems = {
+      prompt: checkPrompt(filledPrompt),
+      ...(kind === "link"
+        ? { link: checkLink(filledLink) }
+        : checkWifi(scan.ssid, scan.password)),
+    };
+    setProblems(found);
+    if (Object.values(found).some(Boolean)) return undefined;
+
+    if (plan.prompt) {
+      filledExample.current = plan.prompt;
+      setPrompt(plan.prompt);
+    }
+    if (plan.link) setScan((current) => ({ ...current, link: filledLink }));
+    return { prompt: filledPrompt.trim(), link: filledLink };
+  };
+
+  /** Once a code has started, a filled-in example is cleared and another shown. */
+  const rotateExample = () => {
+    const filled = filledExample.current;
+    filledExample.current = null;
+    if (filled) setPrompt((current) => (current === filled ? "" : current));
+    setShownExample((current) => pickExample(filled ?? current, random));
   };
 
   const startConnect = async () => {
@@ -219,19 +318,69 @@ export const App = ({
     }
   };
 
+  /**
+   * Sends the chosen logo and returns its id for the code. Undefined when it
+   * couldn't be sent: why is shown under the logo, or in the alert when it
+   * isn't about the logo (a lost connection, the daily allowance).
+   */
+  const uploadLogo = async (
+    chosen: PreparedLogo,
+  ): Promise<string | undefined> => {
+    setUploadingLogo(true);
+    setLogoError(undefined);
+    try {
+      return (await client.uploadLogo(chosen.dataUrl)).id;
+    } catch (caught) {
+      if (caught instanceof QrxApiError && caught.status === 413) {
+        setLogoError(intl.formatMessage(messages.logoTooLarge));
+      } else if (
+        caught instanceof QrxApiError &&
+        (caught.kind === "invalid-request" || caught.kind === "not-found")
+      ) {
+        const detail = caught.problem?.detail;
+        setLogoError(
+          detail
+            ? intl.formatMessage(messages.logoUploadFailed, { detail })
+            : intl.formatMessage(messages.logoUploadFailedPlain),
+        );
+      } else {
+        handleApiError(caught);
+      }
+      return undefined;
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
   const create = async () => {
     setError(null);
-    if (!validate()) {
+    const filled = fillAndCheck();
+    if (!filled) {
       return;
     }
     if (status !== "signed-in" && !(await startConnect())) {
       return;
     }
 
-    const request = {
-      prompt: prompt.trim(),
-      destination: normaliseLink(link),
+    let logoId: string | undefined;
+    if (logo) {
+      logoId = await uploadLogo(logo);
+      if (!logoId) return;
+    }
+
+    const request: CreateCodeRequest = {
+      prompt: filled.prompt,
+      ...(kind === "link"
+        ? { destination: normaliseLink(filled.link) }
+        : {
+            wifi: {
+              ssid: scan.ssid.trim(),
+              password: scan.password.trim(),
+              security: scan.security,
+            },
+          }),
       ...(styleId ? { style: styleId } : {}),
+      ...(logoId ? { logo: logoId } : {}),
     };
     const controller = new AbortController();
     abortRef.current = controller;
@@ -246,6 +395,7 @@ export const App = ({
         maxMs: MAX_GENERATION_MS,
         signal: controller.signal,
         now,
+        onStarted: rotateExample,
       });
       if (code.status !== "succeeded" || !code.imageUrl) {
         throw new CodeFailedError(code.error?.message);
@@ -333,43 +483,51 @@ export const App = ({
             <Text size="small">{intl.formatMessage(messages.intro)}</Text>
             <FormField
               label={intl.formatMessage(messages.promptLabel)}
+              description={intl.formatMessage(messages.promptDescription)}
               value={prompt}
               error={
-                promptProblem &&
-                intl.formatMessage(PROMPT_ERRORS[promptProblem])
+                problems.prompt &&
+                intl.formatMessage(PROMPT_ERRORS[problems.prompt])
               }
               control={(props) => (
                 <MultilineInput
                   {...props}
-                  placeholder={intl.formatMessage(messages.promptPlaceholder)}
+                  placeholder={shownExample}
                   minRows={3}
                   autoGrow
                   maxLength={MAX_PROMPT_LENGTH}
                   onChange={(value) => {
                     setPrompt(value);
-                    setPromptProblem(undefined);
+                    setProblems((current) => ({
+                      ...current,
+                      prompt: undefined,
+                    }));
                   }}
                 />
               )}
             />
-            <FormField
-              label={intl.formatMessage(messages.linkLabel)}
-              description={intl.formatMessage(messages.linkDescription)}
-              value={link}
-              error={
-                linkProblem && intl.formatMessage(LINK_ERRORS[linkProblem])
-              }
-              control={(props) => (
-                <TextInput
-                  {...props}
-                  type="url"
-                  placeholder={intl.formatMessage(messages.linkPlaceholder)}
-                  onChange={(value) => {
-                    setLink(value);
-                    setLinkProblem(undefined);
-                  }}
-                />
-              )}
+            <ScanFields
+              values={scan}
+              set={setScanValue}
+              linkPlaceholder={exampleUrl}
+              canUseWifi={canUseWifi}
+              canAcceptPayments={canAcceptPayments}
+              errors={{
+                link:
+                  problems.link &&
+                  intl.formatMessage(LINK_ERRORS[problems.link]),
+                ssid: problems.ssid && intl.formatMessage(messages.required),
+                password:
+                  problems.password && intl.formatMessage(messages.required),
+              }}
+            />
+            <LogoField
+              logo={logo}
+              onChange={setLogo}
+              error={logoError}
+              onError={setLogoError}
+              prepare={prepareLogo}
+              disabled={uploadingLogo}
             />
             {signedIn && styleList.length > 0 && (
               <StylePicker
@@ -392,7 +550,7 @@ export const App = ({
             <Button
               variant="primary"
               stretch
-              loading={status === "checking"}
+              loading={status === "checking" || uploadingLogo}
               onClick={create}
             >
               {intl.formatMessage(

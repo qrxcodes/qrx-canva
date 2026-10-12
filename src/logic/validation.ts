@@ -61,3 +61,17 @@ export function checkLink(input: string): LinkProblem | undefined {
   }
   return undefined;
 }
+
+/** The longest Wi-Fi network name and password QRX takes. */
+export const MAX_SSID_LENGTH = 32;
+export const MAX_WIFI_PASSWORD_LENGTH = 63;
+
+export type WifiProblems = { ssid?: "missing"; password?: "missing" };
+
+/** Wi-Fi details are never invented, so both must be filled in. */
+export function checkWifi(ssid: string, password: string): WifiProblems {
+  return {
+    ...(ssid.trim() ? {} : { ssid: "missing" as const }),
+    ...(password.trim() ? {} : { password: "missing" as const }),
+  };
+}

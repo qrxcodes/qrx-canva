@@ -20,6 +20,7 @@ PANEL = {"width": 360, "height": 1000}
 
 PROMPT = "A viking longship in a misty fjord"
 LINK = "example.com/menu"
+LOGO = ROOT / "brand" / "qrx-mark.svg"
 
 
 def serve():
@@ -36,10 +37,16 @@ def shot(page, name):
 
 
 def fill_form(page, style="Water color"):
-    page.get_by_role("textbox", name="Picture").fill(PROMPT)
-    page.get_by_role("textbox", name="Link").fill(LINK)
+    page.get_by_role("textbox", name="Describe the picture").fill(PROMPT)
+    page.get_by_role("textbox", name="Link (URL)").fill(LINK)
+    page.locator('input[type="file"]').set_input_files(str(LOGO))
+    page.get_by_text("Placed in the centre of the code").wait_for()
     if style:
         page.get_by_role("button", name=style).click()
+    # choosing a style scrolls the panel; show the form from the top
+    page.evaluate(
+        "document.querySelectorAll('*').forEach(e => { if (e.scrollTop) e.scrollTop = 0; })"
+    )
 
 
 def main():
@@ -57,18 +64,17 @@ def main():
             return page
 
         for theme in ("light", "dark"):
+            # signed out, with the form blank: the examples a blank form is filled with show
             page = open_page(f"theme={theme}&signedIn=0")
-            page.get_by_role("textbox", name="Picture").fill(PROMPT)
-            page.get_by_role("textbox", name="Link").fill(LINK)
             shot(page, f"01-connect-{theme}")
             page.context.close()
 
             page = open_page(f"theme={theme}&payments=1")
-            page.get_by_text("Style:").wait_for()
+            page.get_by_role("button", name="Water color").wait_for()
             fill_form(page)
             shot(page, f"02-form-{theme}")
 
-            page.get_by_role("button", name="Create QR code").click()
+            page.get_by_role("button", name="Generate code").click()
             page.get_by_role("progressbar").wait_for()
             page.wait_for_timeout(22_000)
             shot(page, f"03-progress-{theme}")

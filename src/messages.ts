@@ -3,44 +3,133 @@ import { defineMessages } from "react-intl";
 export const messages = defineMessages({
   intro: {
     defaultMessage:
-      "Describe a picture and add a link. QRX paints the QR code into the picture and checks that it scans before you add it to your design.",
+      "QRX paints a QR code into a picture and checks that it scans before you add it to your design.",
     description: "Short explanation at the top of the app panel.",
   },
   promptLabel: {
-    defaultMessage: "Picture",
+    defaultMessage: "Describe the picture",
     description: "Label for the field where the user describes the picture.",
   },
-  promptPlaceholder: {
-    defaultMessage: "A lighthouse on a cliff at sunset",
+  promptDescription: {
+    defaultMessage:
+      "Name a subject and a setting. The more specific the description, the better the code. Leave blank and we’ll write one for you.",
     description:
-      "Example placeholder for the picture description. Translate loosely.",
+      "Help text under the picture description. A blank description is filled with the example shown in the field.",
+  },
+  whenScannedLabel: {
+    defaultMessage: "When scanned",
+    description:
+      "Label for the choice of what the QR code does when scanned: open a link or join a Wi-Fi network.",
+  },
+  scanLink: {
+    defaultMessage: "Open a link",
+    description: "Option: the QR code opens a web page.",
+  },
+  scanWifi: {
+    defaultMessage: "Wi-Fi",
+    description: "Option: the QR code joins a Wi-Fi network.",
+  },
+  wifiNeedsStarter: {
+    defaultMessage: "Wi-Fi codes come with the Starter plan.",
+    description:
+      "Shown when the account can't make Wi-Fi codes, only where payments are allowed. Starter is the name of the paid plan.",
   },
   linkLabel: {
-    defaultMessage: "Link",
+    defaultMessage: "Link (URL)",
     description: "Label for the field with the web address the QR code opens.",
   },
-  linkPlaceholder: {
-    defaultMessage: "example.com/menu",
-    description:
-      "Placeholder for the web address field. Keep it a plausible web address.",
-  },
   linkDescription: {
-    defaultMessage:
-      "The code opens a short qrx.to link that sends people to this page.",
+    defaultMessage: "People who scan the code go here.",
     description: "Help text under the link field.",
+  },
+  ssidLabel: {
+    defaultMessage: "Network name (SSID)",
+    description: "Label for the Wi-Fi network name field.",
+  },
+  ssidPlaceholder: {
+    defaultMessage: "Network name",
+    description: "Placeholder for the Wi-Fi network name field.",
+  },
+  securityLabel: {
+    defaultMessage: "Security",
+    description: "Label for the Wi-Fi security type (WPA or WEP).",
+  },
+  passwordLabel: {
+    defaultMessage: "Password",
+    description: "Label for the Wi-Fi password field.",
+  },
+  passwordPlaceholder: {
+    defaultMessage: "Password",
+    description: "Placeholder for the Wi-Fi password field.",
+  },
+  wifiNote: {
+    defaultMessage:
+      "The network name and password are printed into the code, so they cannot be changed after you generate it.",
+    description: "Note under the Wi-Fi fields.",
+  },
+  required: {
+    defaultMessage: "This is required.",
+    description: "Error when a required field is empty.",
+  },
+  logoLabel: {
+    defaultMessage: "Logo",
+    description:
+      "Label for the optional logo placed in the centre of the code. The field is marked optional.",
+  },
+  logoTypes: {
+    defaultMessage: "PNG, JPEG, WebP or SVG",
+    description: "The image types the logo can be.",
+  },
+  logoPlaced: {
+    defaultMessage: "Placed in the centre of the code",
+    description: "Shown under the chosen logo.",
+  },
+  logoReading: {
+    defaultMessage: "Reading logo…",
+    description: "Shown while a chosen logo is being read.",
+  },
+  removeLogo: {
+    defaultMessage: "Remove logo",
+    description:
+      "Accessible label for the button that removes the chosen logo.",
+  },
+  logoPreviewAlt: {
+    defaultMessage: "Selected logo",
+    description: "Alt text for the preview of the chosen logo.",
+  },
+  logoWrongType: {
+    defaultMessage: "Choose a PNG, JPEG, WebP or SVG image",
+    description: "Error when the chosen logo isn't a supported image.",
+  },
+  logoTooLarge: {
+    defaultMessage: "This image is too large; choose a smaller one",
+    description: "Error when the chosen logo is too large.",
+  },
+  logoUnreadable: {
+    defaultMessage: "The image could not be read",
+    description: "Error when the chosen logo can't be read as an image.",
+  },
+  logoUploadFailed: {
+    defaultMessage: "The logo could not be uploaded: {detail}",
+    description:
+      "Error when QRX refused the logo. {detail} is QRX's explanation in English.",
+  },
+  logoUploadFailedPlain: {
+    defaultMessage: "The logo could not be uploaded",
+    description: "Error when the logo couldn't be sent to QRX.",
   },
   styleLabel: {
     defaultMessage: "Style",
     description: "Label for the style picker.",
   },
-  styleChosen: {
-    defaultMessage: "Style: {name}",
-    description: "Label for the style picker, with the chosen style's name.",
-  },
   styleNone: {
-    defaultMessage: "No style",
+    defaultMessage: "None",
     description:
       "Style option that leaves the look to the picture description.",
+  },
+  styleHint: {
+    defaultMessage: "With None, describe the look you want in the description.",
+    description: "Hint under the style picker.",
   },
   styleSignedOut: {
     defaultMessage: "Connect your QRX account to choose a style.",
@@ -55,11 +144,11 @@ export const messages = defineMessages({
     description: "Alt text for a style preview image. {name} is the style.",
   },
   create: {
-    defaultMessage: "Create QR code",
+    defaultMessage: "Generate code",
     description: "Primary button that starts making a QR code.",
   },
   connectAndCreate: {
-    defaultMessage: "Connect QRX and create",
+    defaultMessage: "Connect QRX and generate",
     description:
       "Primary button shown before sign-in. Connects a QRX account, then starts making the QR code.",
   },
@@ -80,10 +169,6 @@ export const messages = defineMessages({
       "You'll sign in to QRX, or create a free account, in a new tab.",
     description: "Shown under the connect button before sign-in.",
   },
-  promptMissing: {
-    defaultMessage: "Describe the picture you want.",
-    description: "Error when the picture description is empty.",
-  },
   promptTooLong: {
     defaultMessage: "Keep the description under 1,000 characters.",
     description: "Error when the picture description is too long.",
@@ -92,10 +177,6 @@ export const messages = defineMessages({
     defaultMessage:
       "This description includes words QRX doesn't allow. Try different words.",
     description: "Error when the description contains blocked words.",
-  },
-  linkMissing: {
-    defaultMessage: "Add the link the code should open.",
-    description: "Error when the link is empty.",
   },
   linkInvalid: {
     defaultMessage: "Enter a web address, such as example.com/menu.",
@@ -153,6 +234,10 @@ export const messages = defineMessages({
     description:
       "Explains the code's short link. {shortUrl} is like qrx.to/abc123 and {destination} is the user's link.",
   },
+  joinsWifi: {
+    defaultMessage: "Joins the Wi-Fi network {ssid}.",
+    description: "Explains a Wi-Fi code. {ssid} is the network's name.",
+  },
   changeLinkPaid: {
     defaultMessage:
       "On a paid plan, you can change where this code points on qrx.codes, even after it's printed.",
@@ -176,6 +261,11 @@ export const messages = defineMessages({
   designAltText: {
     defaultMessage: "QR code that opens {link}",
     description: "Alt text for the QR code image added to the design.",
+  },
+  designAltTextWifi: {
+    defaultMessage: "QR code that joins the Wi-Fi network {ssid}",
+    description:
+      "Alt text for a Wi-Fi QR code image added to the design. {ssid} is the network's name.",
   },
   recentTitle: {
     defaultMessage: "Recent codes",

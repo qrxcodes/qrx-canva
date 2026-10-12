@@ -1,8 +1,10 @@
 import type { QrxConfig } from "src/config";
 import type {
+  Account,
   Code,
   CodeList,
   CreateCodeRequest,
+  Logo,
   Problem,
   Style,
   StyleList,
@@ -144,6 +146,22 @@ export class QrxClient {
   async listCodes(limit: number): Promise<Code[]> {
     const list = await this.request<CodeList>("/codes", { query: { limit } });
     return list.data;
+  }
+
+  async getAccount(): Promise<Account> {
+    return this.request<Account>("/account");
+  }
+
+  /**
+   * Stores a logo (a PNG data URL) for codes made after it; the id goes in
+   * the create request.
+   */
+  async uploadLogo(image: string, signal?: AbortSignal): Promise<Logo> {
+    return this.request<Logo>("/logos", {
+      method: "POST",
+      body: { image },
+      signal,
+    });
   }
 
   async getCode(

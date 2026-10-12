@@ -8,8 +8,10 @@ the day of submission, and update the moderation answer if the owner adds an ima
 
 **What does the app do?**
 It makes an art QR code from a picture description and a link, and adds the finished image to the user's design. The
-user connects a QRX account, types what the picture should show and the web address the code should open, optionally
-picks a style, and waits about a minute while QRX makes the code.
+user connects a QRX account, types what the picture should show and the web address the code should open (a blank
+field is filled with the example shown in it), optionally adds a logo for the centre of the code and picks a style,
+and waits about a minute while QRX makes the code. On a plan with Wi-Fi codes, the code can join a Wi-Fi network
+instead of opening a link.
 
 **Who is it for?**
 People making printed or on-screen designs that carry a QR code: posters, menus, flyers, packaging, event signage and
@@ -28,7 +30,8 @@ slides, where a plain black-and-white square would clash with the design.
 - `canva:asset:private:write`: to upload the finished PNG to the user's uploads.
 - `canva:design:content:write`: to place the image on the page.
 
-It asks for nothing else and reads nothing from the design.
+It asks for nothing else and reads nothing from the design. A logo comes from a file the user chooses in the panel
+(the App UI Kit's `FileInput`).
 
 ## Authentication and data
 
@@ -39,9 +42,12 @@ sign-up happen in the authorisation tab, never in the panel. Disconnecting calls
 URL is configured so removing the app revokes the tokens.
 
 **What data does the app send, and where?**
-To the QRX API (qrx.codes, HTTPS only): the picture description, the link, the chosen style, the QRX access token, and
-the Canva user token (a short-lived JWT the API uses to verify that requests come from this app). QRX stores the
-description, link, style and finished image in the user's QRX account so they appear in the user's gallery. Nothing
+To the QRX API (qrx.codes, HTTPS only): the picture description, the link (or, for a Wi-Fi code, the network name,
+security type and password), the chosen style, the logo image if the user chooses one (prepared in the panel as a PNG
+of at most 1024 px), the QRX access token, and the Canva user token (a short-lived JWT the API uses to verify that
+requests come from this app). QRX stores the description, link or network name, style, logo and finished image in the
+user's QRX account so they appear in the user's gallery. The Wi-Fi password is printed into the code and isn't stored
+with it. Nothing
 is sent to any other service from the app. The app reads nothing from the design.
 
 **Do you sell or share user data, or use it for advertising?**
@@ -78,6 +84,8 @@ AI. Nothing in the app suggests the images are made by a person.
   (the image is decoded to confirm the QR code opens the right link). The production image model doesn't apply a
   negative prompt. QRX is deciding whether to add an image safety check; until one is live, the word filter is the
   only content safeguard.
+- **Logos are the user's own images.** A chosen logo is placed in the centre of the code as given; it isn't checked
+  for content.
 - **Reporting.** Under each finished code, the panel links to Canva's report form ("Something not right with an image?
   Report it"). Users can also contact QRX through https://qrx.codes/support.
 

@@ -1,10 +1,18 @@
 # QRX for Canva
 
-A Canva app that turns a picture description and a link into an art QR code, and adds it to your design.
+A Canva app that paints a QR code into a picture, checks that it scans, and adds it to your design. The panel's
+form is the QRX web app's: the same fields, wording and behaviour.
 
 - **Connect a QRX account** through Canva's OAuth support. QRX uses Clerk as its identity provider; Canva stores and
   refreshes the tokens, so the app keeps none of its own.
-- **Describe the picture, add the link, pick a style.** The link field accepts `example.com/menu` and adds `https://`.
+- **Describe the picture, choose what the code does, add a logo, pick a style.** Every field is optional, as on
+  qrx.codes: a blank description is filled with the example shown in it (the web app's list,
+  `src/logic/example_descriptions.ts`), and a blank link with `<QRX_SITE_URL>/example`. The link field accepts
+  `example.com/menu` and adds `https://`. Wi-Fi codes are offered when the account's plan has them
+  (`GET /account`); the Wi-Fi details are never invented.
+- **Logo (optional).** A PNG, JPEG, WebP or SVG chosen with the App UI Kit's `FileInput`, prepared in the panel as the
+  web app does (SVGs rasterised, scaled to at most 1024 px, sent as a PNG so transparency is kept) and placed in the
+  centre of the code. Files over 10 MB are turned away with "This image is too large; choose a smaller one".
 - **Wait about a minute.** The app long-polls the QRX API and shows a progress bar paced to the usual time. Every code
   is decoded by QRX to check that it scans before it's returned.
 - **Add to design.** The finished PNG is uploaded to the user's media (marked as AI-generated) and placed on the page.
@@ -64,8 +72,10 @@ Built on the public REST API ([OpenAPI](https://qrx.codes/v1/openapi.json)):
 | Step | Request |
 |---|---|
 | Styles | `GET {base}/styles` |
-| Recent codes | `GET {base}/codes?limit=12` (finished link codes only are shown) |
-| Create | `POST {base}/codes` with `{ prompt, destination, style? }` and an `Idempotency-Key`; retried once with the same key after a network failure, and after `409 idempotency-in-progress` |
+| Account | `GET {base}/account`, for whether the plan has Wi-Fi codes |
+| Recent codes | `GET {base}/codes?limit=12` (finished link and Wi-Fi codes are shown) |
+| Logo | `POST {base}/logos` with `{ image }` (the prepared PNG as a data URL), when one was chosen; answers the logo's `id` |
+| Create | `POST {base}/codes` with `{ prompt, destination \| wifi, style?, logo? }` and an `Idempotency-Key`; retried once with the same key after a network failure, and after `409 idempotency-in-progress` |
 | Wait | `GET {base}/codes/{id}?wait=25`, repeated until `succeeded` or `failed` (gives up waiting after 5 minutes; the code still appears in Recent codes) |
 
 `{base}` is `/canva/v1` in `canva` mode and `/v1` in `direct` mode. A `401` triggers one forced token refresh and
@@ -103,7 +113,10 @@ then prod) before the app works in Canva:
 
 - **CORS** on `/v1` and `/canva/v1` for `https://app-<appid>.canva-apps.com` (each Canva app record has its own ID),
   allowing the `Authorization`, `Content-Type`, `Idempotency-Key` and (in `canva` mode) `X-QRX-Authorization` headers.
-- **Canva request verification** (`canva` mode): `/canva/v1/codes`, `/canva/v1/codes/{id}` and `/canva/v1/styles`
+- **Logos:** `POST /v1/logos` and `logo` on `POST /v1/codes`. Until they are live on the
+  API the app talks to, a code made with a logo is refused; without one, nothing changes.
+- **Canva request verification** (`canva` mode): `/canva/v1/codes`, `/canva/v1/codes/{id}`, `/canva/v1/styles`,
+  `/canva/v1/account` and `/canva/v1/logos`
   accept the Canva user token in `Authorization` (checked against Canva's JWKS for the app IDs) and the QRX access
   token in `X-QRX-Authorization: Bearer …`, and behave like the matching `/v1` routes. Not needed if Canva confirms
   OAuth alone is enough (`QRX_API_MODE=direct`).
@@ -123,8 +136,8 @@ src/
   intents/design_editor/        panel entry and App component
   api/                          QRX client, types, image URL resolution
   auth/use_qrx_auth.ts          Canva OAuth wrapper
-  logic/                        validation, polling, progress, error mapping
-  components/                   style picker, progress, result, recent codes, alerts
+  logic/                        validation, examples, logo preparation, polling, progress, error mapping
+  components/                   form fields (scan, logo, style), progress, result, recent codes, alerts
   messages.ts                   every UI string (extracted for Canva's translation)
 utils/qrx_config.ts             build-time settings
 submission/                     Developer Portal listing pack and the tools that made its images

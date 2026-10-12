@@ -32,12 +32,12 @@ Alternative, if the reviewer asks for a different angle: `Turn a picture idea in
 ### Description
 
 ```
-Describe a picture and add a link. QRX paints a QR code into the picture, checks that it scans, and adds it to your design. On a paid plan, you can change where a code points after printing.
+Describe a picture, add a link and a logo. QRX paints a QR code into the picture, checks that it scans, and adds it to your design. On a paid plan, you can change where a code points after printing.
 ```
 
-190 characters (limit: 200), plain text, no line breaks, every sentence ends with punctuation, "design" for what the user
-makes, no marketing claims, no hyperlinks. The longer points (the hosted qrx.to link, the 11 styles, AI-generated
-images, the free account) are in the panel itself and in the testing instructions.
+198 characters (limit: 200), plain text, no line breaks, every sentence ends with punctuation, "design" for what the user
+makes, no marketing claims, no hyperlinks. The longer points (the hosted qrx.to link, the 11 styles, Wi-Fi codes,
+AI-generated images, the free account) are in the panel itself and in the testing instructions.
 
 ### What leads, and why
 
@@ -87,5 +87,6 @@ qrx.codes showcase; the panel is the app's own UI rendered outside Canva with sa
 | Company or website URL | https://qrx.codes |
 
 All four open without signing in. Before submitting, confirm the privacy policy covers what this app sends: the prompt,
-the link and the style the user enters, the Canva user ID in the request-verification token, and the finished image,
-which QRX stores so it appears in the user's QRX gallery.
+the link (or Wi-Fi network details) and the style the user enters, the logo image the user chooses (optional), the
+Canva user ID in the request-verification token, and the finished image, which QRX stores so it appears in the user's
+QRX gallery.
